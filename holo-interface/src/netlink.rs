@@ -242,6 +242,7 @@ pub(crate) async fn vlan_create(
 pub(crate) async fn macvlan_create(
     handle: &Handle,
     name: String,
+    mac_address: Option<[u8; 6]>,
     parent_ifindex: u32,
 ) {
     // Create netlink request
@@ -250,9 +251,11 @@ pub(crate) async fn macvlan_create(
         parent_ifindex,
         MACVLAN_MODE_BRIDGE,
     );
-    // address() method is added in rtnetlink version 0.14.0. Will be uncommented when the
-    // version upgrade is done in this project.
-    //.address(vec![0x00, 0x00, 0x5e, 0x00, 0x01, 0x1e]);
+
+    // will be uncommented on upgrade of rtnetlink
+    //if Some(address) = mac_address {
+    //    request.address(address);
+    //}
 
     // Execute request.
     if let Err(error) = request.execute().await {

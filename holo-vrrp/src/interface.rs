@@ -119,9 +119,11 @@ impl Interface {
 
         //  `mvlan-vrrp{primary-interface-ifindex}{vrid}`
         let name = format!("mvlan-vrrp-{}", vrid);
+        let mac_address: [u8; 6] = [0x00, 0x00, 0x5e, 0x00, 0x01, vrid];
         southbound::create_macvlan_address(
             name.clone(),
             self.name.clone(),
+            mac_address, // virtual mac address
             &self.tx.ibus,
         );
 

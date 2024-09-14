@@ -89,9 +89,14 @@ pub(crate) fn process_addr_del(iface: &mut Interface, msg: AddressMsg) {
 pub(crate) fn create_macvlan_address(
     name: String,
     parent_name: String,
+    mac_address: [u8; 6],
     ibus_tx: &IbusSender,
 ) {
-    let msg = MacvlanCreateMsg { parent_name, name };
+    let msg = MacvlanCreateMsg {
+        parent_name,
+        name,
+        mac_address: Some(mac_address),
+    };
     let _ = ibus_tx.send(IbusMsg::CreateMacVlan(msg));
 }
 

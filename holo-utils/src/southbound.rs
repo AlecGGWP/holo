@@ -81,6 +81,7 @@ pub struct InterfaceUpdateMsg {
 pub struct MacvlanCreateMsg {
     pub parent_name: String,
     pub name: String,
+    pub mac_address: Option<[u8; 6]>,
 }
 
 #[derive(Clone, Debug)]

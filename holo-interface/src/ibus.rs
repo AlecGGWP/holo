@@ -63,6 +63,7 @@ pub(crate) async fn process_msg(master: &mut Master, msg: IbusMsg) {
                 .create_macvlan_interface(
                     &master.netlink_handle,
                     &msg.parent_name,
+                    msg.mac_address,
                     msg.name,
                 )
                 .await;

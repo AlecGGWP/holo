@@ -412,6 +412,7 @@ impl Interfaces {
         &self,
         netlink_handle: &rtnetlink::Handle,
         parent_name: &str,
+        mac_address: Option<[u8; 6]>,
         mvlan_name: String,
     ) {
         if let Some(interface) = self.get_by_name(parent_name) {
@@ -419,6 +420,7 @@ impl Interfaces {
                 let _ = netlink::macvlan_create(
                     netlink_handle,
                     mvlan_name,
+                    mac_address,
                     ifindex,
                 )
                 .await;
