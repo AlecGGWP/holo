@@ -244,20 +244,19 @@ pub(crate) async fn vlan_create(
 pub(crate) async fn macvlan_create(
     handle: &Handle,
     name: String,
-    _mac_address: Option<[u8; 6]>,
+    mac_address: Option<[u8; 6]>,
     parent_ifindex: u32,
 ) {
     // Create netlink request
-    let request = handle.link().add().macvlan(
+    let mut request = handle.link().add().macvlan(
         name.clone(),
         parent_ifindex,
         MACVLAN_MODE_BRIDGE,
     );
 
-    // will be uncommented on upgrade of rtnetlink
-    //if Some(address) = mac_address {
-    //    request.address(address);
-    //}
+    if let Some(address) = mac_address {
+        request = request.address(address.to_vec());
+    }
 
     // Execute request.
     if let Err(error) = request.execute().await {
