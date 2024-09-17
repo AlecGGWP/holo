@@ -242,7 +242,7 @@ pub(crate) async fn vlan_create(
 pub(crate) async fn macvlan_create(
     handle: &Handle,
     name: String,
-    mac_address: Option<[u8; 6]>,
+    _mac_address: Option<[u8; 6]>,
     parent_ifindex: u32,
 ) {
     // Create netlink request
