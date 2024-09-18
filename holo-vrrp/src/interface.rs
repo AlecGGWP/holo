@@ -126,13 +126,6 @@ impl Interface {
             mac_address, // virtual mac address
             &self.tx.ibus,
         );
-
-        // change the interface mac address to the virtual MAC adderss
-        southbound::update_iface_mac_address(
-            name,
-            [0x00, 0x00, 0x5e, 0x00, 0x01, vrid],
-            &self.tx.ibus,
-        );
     }
 
     pub(crate) fn change_state(&mut self, vrid: u8, state: State) {

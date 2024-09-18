@@ -99,12 +99,3 @@ pub(crate) fn create_macvlan_address(
     };
     let _ = ibus_tx.send(IbusMsg::CreateMacVlan(msg));
 }
-
-pub(crate) fn update_iface_mac_address(
-    ifname: String,
-    mac: [u8; 6],
-    ibus_tx: &IbusSender,
-) {
-    let msg = IbusMsg::InterfaceMacAddressUpdate { ifname, mac };
-    let _ = ibus_tx.send(msg);
-}

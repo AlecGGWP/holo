@@ -264,19 +264,6 @@ pub(crate) async fn macvlan_create(
     }
 }
 
-// change the Mac address of an interface
-pub(crate) async fn update_iface_mac(
-    handle: &Handle,
-    ifindex: u32,
-    mac_address: &[u8; 6],
-) {
-    let request = handle.link().set(ifindex).address(mac_address.to_vec());
-
-    if let Err(error) = request.execute().await {
-        error!(%ifindex, %error,"Failed to change mac address");
-    }
-}
-
 pub(crate) async fn addr_install(
     handle: &Handle,
     ifindex: u32,

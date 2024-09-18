@@ -68,12 +68,6 @@ pub(crate) async fn process_msg(master: &mut Master, msg: IbusMsg) {
                 )
                 .await;
         }
-        IbusMsg::InterfaceMacAddressUpdate { ifname, mac } => {
-            master
-                .interfaces
-                .update_iface_mac_address(&master.netlink_handle, &ifname, mac)
-                .await;
-        }
         // Ignore other events.
         _ => {}
     }
