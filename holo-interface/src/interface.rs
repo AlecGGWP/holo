@@ -223,7 +223,7 @@ impl Interfaces {
                     addresses: Default::default(),
                     owner: Owner::SYSTEM,
                     vrrp: None,
-                    mac_address: Default::default(),
+                    mac_address,
                 };
 
                 // Notify protocol instances about the interface update.
