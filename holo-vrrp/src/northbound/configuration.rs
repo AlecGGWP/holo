@@ -186,9 +186,10 @@ impl Provider for Interface {
 // ===== impl InstanceCfg ====
 impl InstanceCfg {
     pub fn new(vrid: u8) -> Self {
-        let mut cfg = InstanceCfg::default();
-        cfg.mac_vlan = MacVlanInterface::new(vrid);
-        cfg
+        Self {
+            mac_vlan: MacVlanInterface::new(vrid),
+            ..Default::default()
+        }
     }
 }
 
