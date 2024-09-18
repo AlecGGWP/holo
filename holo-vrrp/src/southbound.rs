@@ -13,7 +13,6 @@ use ipnetwork::IpNetwork;
 use crate::interface::Interface;
 
 // ===== global functions =====
-
 pub(crate) fn process_iface_update(
     iface: &mut Interface,
     msg: InterfaceUpdateMsg,
@@ -42,6 +41,7 @@ pub(crate) fn process_iface_update(
             mvlan_iface.system.flags = msg.flags;
             mvlan_iface.system.ifindex = Some(msg.ifindex);
             mvlan_iface.system.mac_address = msg.mac_address;
+            mvlan_iface.create_net(&iface.tx);
             return;
         }
     }

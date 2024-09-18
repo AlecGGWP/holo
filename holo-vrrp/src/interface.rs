@@ -61,6 +61,7 @@ pub struct MacVlanInterface {
     // Interface system data.
     pub system: InterfaceSys,
     // Interface raw sockets and Tx/Rx tasks.
+    pub net: Option<InterfaceNet>,
 }
 
 #[derive(Debug, Default)]
@@ -280,7 +281,15 @@ impl MacVlanInterface {
         Self {
             name,
             system: InterfaceSys::default(),
+            net: None,
         }
+    }
+
+    pub fn create_net(&mut self, tx_channels: &InstanceChannelsTx<Interface>) {
+        let net = InterfaceNet::new(&self.name, tx_channels)
+            .expect("Failed to initialize VRRP tasks");
+        self.net = Some(net);
+        println!("...");
     }
 }
 
