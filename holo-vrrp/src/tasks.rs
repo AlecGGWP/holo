@@ -56,7 +56,6 @@ pub mod messages {
 
         #[derive(Debug, Deserialize, Serialize)]
         pub enum ProtocolMsg {
-            ArpNetRxPacket(ArpNetRxPacketMsg),
             VrrpNetRxPacket(VrrpNetRxPacketMsg),
             MasterDownTimer(MasterDownTimerMsg),
         }
@@ -99,37 +98,6 @@ pub mod messages {
                 arp_packet: ArpPacket,
             },
         }
-    }
-}
-
-// ==== ARP tasks ====
-// Network Rx task
-pub(crate) fn arp_net_rx(
-    ifname: String,
-    arp_net_packet_rxp: &Sender<messages::input::ArpNetRxPacketMsg>,
-) -> Task<()> {
-    #[cfg(not(feature = "testing"))]
-    {
-        let span1 = debug_span!("network");
-        let _span1_guard = span1.enter();
-        let span2 = debug_span!("input");
-        let _span2_guard = span2.enter();
-
-        let arp_net_packet_rxp = arp_net_packet_rxp.clone();
-        let span = tracing::span::Span::current();
-        Task::spawn(
-            async move {
-                let _span_enter = span.enter();
-                let _ =
-                    network::arp_read_loop(&ifname, arp_net_packet_rxp).await;
-            }
-            .in_current_span(),
-        )
-    }
-
-    #[cfg(feature = "testing")]
-    {
-        Task::spawn(async move { std::future::pending().await })
     }
 }
 

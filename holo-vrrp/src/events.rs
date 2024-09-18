@@ -6,11 +6,10 @@ use std::net::Ipv4Addr;
 use std::time::Duration;
 
 use crate::error::{Error, IoError};
-use crate::instance::{Instance, State};
+use crate::instance::State;
 use crate::interface::Interface;
-use crate::packet::{ArpPacket, DecodeResult, EthernetFrame, VrrpPacket};
+use crate::packet::{DecodeResult, VrrpPacket};
 use crate::tasks;
-use crate::tasks::messages::output::NetTxPacketMsg;
 
 // To collect actions to be executed later
 enum VrrpAction {
@@ -46,95 +45,6 @@ pub(crate) fn process_vrrp_packet(
 
     // execute all collected actions
     handle_vrrp_actions(interface, action);
-    Ok(())
-}
-
-// ==== Arp Network Packet receipt ====
-pub(crate) fn process_arp_packet(
-    interface: &mut Interface,
-    packet: DecodeResult<ArpPacket>,
-) -> Result<(), Error> {
-    // Handle packet decoding errors
-    let pkt = match packet {
-        Ok(pkt) => pkt,
-        Err(_e) => {
-            return Err(Error::IoError(IoError::RecvError(
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "problem receiving ARP packet",
-                ),
-            )))
-        }
-    };
-
-    let mut instance: Option<&mut Instance> = None;
-
-    'outer: for (_vr, inst) in interface.instances.iter_mut() {
-        for addr in inst.config.virtual_addresses.clone() {
-            let addr_arr = addr.ip().octets();
-            if addr_arr == pkt.target_proto_address {
-                instance = Some(inst);
-                break 'outer;
-            }
-        }
-    }
-
-    let instance = match instance {
-        Some(i) => i,
-        // the target ip address in the ARP request is for none of the instances
-        None => return Ok(()),
-    };
-
-    match instance.state.state {
-        State::Initialize => {}
-        State::Backup => {
-            // ========================================================
-            // RFC 3768 Section 6.4.2. Backup
-            // While in this state, a VRRP router MUST do the following
-            // ========================================================
-
-            // MUST NOT respond to ARP requests for the IP address(es) associated with the virutal
-            // router
-        }
-        State::Master => {
-            // ========================================================
-            // RFC 3768 Section 6.4.3. Master
-            // While in the {Maste} state the router functions as the forwarding router for the IP
-            // address(es) associated with the virtual router.
-            // While in this state, a VRRP router MUST do the following:
-            // ========================================================
-
-            // MUST respond to ARP requests for the IP address(es) associated with the virtual
-            // router
-
-            if pkt.operation == 1 {
-                // if is ARP request
-                // build ARP response packet.
-                let mut arp_response_pkt = pkt.clone();
-                arp_response_pkt.operation = 2; // reply operation
-                arp_response_pkt.sender_hw_address = pkt.target_hw_address;
-                arp_response_pkt.target_hw_address = pkt.sender_hw_address;
-                arp_response_pkt.sender_proto_address =
-                    pkt.target_proto_address;
-                arp_response_pkt.target_proto_address =
-                    pkt.sender_proto_address;
-
-                // build ethernet packet
-                let eth_frame = EthernetFrame {
-                    ethertype: 0x806,
-                    src_mac: interface.system.mac_address,
-                    dst_mac: pkt.sender_hw_address,
-                };
-                let msg = NetTxPacketMsg::Arp {
-                    name: interface.name.clone(),
-                    eth_frame,
-                    arp_packet: arp_response_pkt,
-                };
-                let _ = interface.net.net_tx_packetp.send(msg);
-            }
-        }
-    }
-
     Ok(())
 }
 

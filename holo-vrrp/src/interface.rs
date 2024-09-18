@@ -24,9 +24,7 @@ use tokio::sync::mpsc;
 use crate::error::{Error, IoError};
 use crate::instance::{Instance, State};
 use crate::packet::{ArpPacket, EthernetFrame, VrrpPacket};
-use crate::tasks::messages::input::{
-    ArpNetRxPacketMsg, MasterDownTimerMsg, VrrpNetRxPacketMsg,
-};
+use crate::tasks::messages::input::{MasterDownTimerMsg, VrrpNetRxPacketMsg};
 use crate::tasks::messages::output::NetTxPacketMsg;
 use crate::tasks::messages::{ProtocolInputMsg, ProtocolOutputMsg};
 use crate::{events, network, southbound, tasks};
@@ -82,10 +80,13 @@ pub struct InterfaceNet {
     // Raw sockets.
     pub socket_vrrp: Arc<AsyncFd<Socket>>,
     pub socket_arp: Arc<AsyncFd<Socket>>,
+
     // Network Tx/Rx tasks.
     _net_tx_task: Task<()>,
+
+    // network Tx/Rx tasks. But specifically for VRRP packets.
     _vrrp_net_rx_task: Task<()>,
-    _arp_net_rx_task: Task<()>,
+
     // Network Tx output channel.
     pub net_tx_packetp: UnboundedSender<NetTxPacketMsg>,
 }
@@ -94,8 +95,6 @@ pub struct InterfaceNet {
 pub struct ProtocolInputChannelsTx {
     // VRRP Packet Tx event.
     pub vrrp_net_packet_tx: Sender<VrrpNetRxPacketMsg>,
-    // ARP Packet Tx event.
-    pub arp_net_packet_tx: Sender<ArpNetRxPacketMsg>,
     // Master Down event
     pub master_down_timer_tx: Sender<MasterDownTimerMsg>,
 }
@@ -104,8 +103,6 @@ pub struct ProtocolInputChannelsTx {
 pub struct ProtocolInputChannelsRx {
     // VRRP Packet Rx event.
     pub vrrp_net_packet_rx: Receiver<VrrpNetRxPacketMsg>,
-    // ARP Packet Rx event
-    pub arp_net_packet_rx: Receiver<ArpNetRxPacketMsg>,
     // Master Down event
     pub master_down_timer_rx: Receiver<MasterDownTimerMsg>,
 }
@@ -245,9 +242,6 @@ impl ProtocolInstance for Interface {
             ProtocolInputMsg::VrrpNetRxPacket(msg) => {
                 events::process_vrrp_packet(self, msg.src, msg.packet)
             }
-            ProtocolInputMsg::ArpNetRxPacket(msg) => {
-                events::process_arp_packet(self, msg.packet)
-            }
             ProtocolInputMsg::MasterDownTimer(msg) => {
                 events::handle_master_down_timer(self, msg.vrid)
             }
@@ -259,17 +253,14 @@ impl ProtocolInstance for Interface {
     fn protocol_input_channels(
     ) -> (ProtocolInputChannelsTx, ProtocolInputChannelsRx) {
         let (vrrp_net_packet_rxp, vrrp_net_packet_rxc) = mpsc::channel(4);
-        let (arp_net_packet_rxp, arp_net_packet_rxc) = mpsc::channel(4);
         let (master_down_timerp, master_down_timerc) = mpsc::channel(4);
 
         let tx = ProtocolInputChannelsTx {
             vrrp_net_packet_tx: vrrp_net_packet_rxp,
-            arp_net_packet_tx: arp_net_packet_rxp,
             master_down_timer_tx: master_down_timerp,
         };
         let rx = ProtocolInputChannelsRx {
             vrrp_net_packet_rx: vrrp_net_packet_rxc,
-            arp_net_packet_rx: arp_net_packet_rxc,
             master_down_timer_rx: master_down_timerc,
         };
 
@@ -316,17 +307,12 @@ impl InterfaceNet {
             socket_vrrp.clone(),
             &instance_channels_tx.protocol_input.vrrp_net_packet_tx,
         );
-        let arp_net_rx_task = tasks::arp_net_rx(
-            String::from(ifname),
-            &instance_channels_tx.protocol_input.arp_net_packet_tx,
-        );
 
         Ok(InterfaceNet {
             socket_vrrp,
             socket_arp,
             _net_tx_task: net_tx_task,
             _vrrp_net_rx_task: vrrp_net_rx_task,
-            _arp_net_rx_task: arp_net_rx_task,
             net_tx_packetp,
         })
     }
@@ -341,9 +327,6 @@ impl MessageReceiver<ProtocolInputMsg> for ProtocolInputChannelsRx {
             biased;
             msg = self.vrrp_net_packet_rx.recv() => {
                 msg.map(ProtocolInputMsg::VrrpNetRxPacket)
-            }
-            msg = self.arp_net_packet_rx.recv() => {
-                msg.map(ProtocolInputMsg::ArpNetRxPacket)
             }
             msg = self.master_down_timer_rx.recv() => {
                 msg.map(ProtocolInputMsg::MasterDownTimer)
