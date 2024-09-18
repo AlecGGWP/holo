@@ -111,7 +111,7 @@ pub struct ProtocolInputChannelsRx {
 
 impl Interface {
     pub(crate) fn create_instance(&mut self, vrid: u8) {
-        let instance = Instance::new();
+        let instance = Instance::new(vrid);
         self.instances.insert(vrid, instance);
 
         //  `mvlan-vrrp{primary-interface-ifindex}{vrid}`
@@ -270,6 +270,17 @@ impl ProtocolInstance for Interface {
     #[cfg(feature = "testing")]
     fn test_dir() -> String {
         format!("{}/tests/conformance", env!("CARGO_MANIFEST_DIR"),)
+    }
+}
+
+// ==== impl MacVlanInterface ====
+impl MacVlanInterface {
+    pub fn new(vrid: u8) -> Self {
+        let name = format!("mvlan-vrrp-{}", vrid);
+        Self {
+            name,
+            system: InterfaceSys::default(),
+        }
     }
 }
 

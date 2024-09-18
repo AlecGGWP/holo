@@ -98,9 +98,9 @@ pub struct Statistics {
 // ===== impl Instance =====
 
 impl Instance {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(vrid: u8) -> Self {
         let mut inst = Instance {
-            config: Default::default(),
+            config: InstanceCfg::new(vrid),
             state: InstanceState::new(),
             timer: VrrpTimer::Null,
         };

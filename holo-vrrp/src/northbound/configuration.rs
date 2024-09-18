@@ -51,7 +51,7 @@ pub struct InstanceCfg {
     pub priority: u8,
     pub advertise_interval: u8,
     pub virtual_addresses: BTreeSet<Ipv4Network>,
-    pub mac_vlan: Option<MacVlanInterface>,
+    pub mac_vlan: MacVlanInterface,
 }
 
 // ===== callbacks =====
@@ -173,13 +173,22 @@ impl Provider for Interface {
     async fn process_event(&mut self, event: Event) {
         match event {
             Event::InstanceCreate { vrid } => {
-                let instance = Instance::new();
+                let instance = Instance::new(vrid);
                 self.instances.insert(vrid, instance);
             }
             Event::InstanceDelete { vrid } => {
                 self.instances.remove(&vrid);
             }
         }
+    }
+}
+
+// ===== impl InstanceCfg ====
+impl InstanceCfg {
+    pub fn new(vrid: u8) -> Self {
+        let mut cfg = InstanceCfg::default();
+        cfg.mac_vlan = MacVlanInterface::new(vrid);
+        cfg
     }
 }
 
@@ -200,7 +209,7 @@ impl Default for InstanceCfg {
             priority,
             advertise_interval,
             virtual_addresses: Default::default(),
-            mac_vlan: None,
+            mac_vlan: MacVlanInterface::new(0),
         }
     }
 }
