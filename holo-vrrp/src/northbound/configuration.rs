@@ -7,6 +7,7 @@
 #![allow(clippy::derivable_impls)]
 
 use std::collections::BTreeSet;
+use std::net::Ipv4Addr;
 use std::sync::LazyLock as Lazy;
 
 use async_trait::async_trait;
@@ -27,6 +28,7 @@ pub enum ListEntry {
     #[default]
     None,
     Vrid(u8),
+    VirtualIpv4Addr(u8, Ipv4Network),
 }
 
 #[derive(Debug)]
@@ -126,12 +128,14 @@ fn load_callbacks() -> Callbacks<Interface> {
             let _ = &interface.add_instance_virtual_address(vrid, IpNetwork::V4(addr));
         })
         .delete_apply(|interface, args| {
-            let vrid = args.list_entry.into_vrid().unwrap();
-            let addr = args.dnode.get_prefix4();
-            let _ = &interface.delete_instance_virtual_address(vrid, IpNetwork::V4(addr));
+            let (vrid, addr) = args.list_entry.into_virtual_ipv4_addr().unwrap();
+            let addr = IpNetwork::V4(addr);
+            let _ = &interface.delete_instance_virtual_address(vrid, addr);
         })
-        .lookup(|_instance, _list_entry, _dnode| {
-            ListEntry::None
+        .lookup(|interface, list_entry, dnode| {
+            let vrid = list_entry.into_vrid().unwrap();
+            let addr = dnode.get_prefix4_relative("ipv4-address").unwrap();
+            return ListEntry::VirtualIpv4Addr(vrid, addr)  
         })
         .build()
 }
