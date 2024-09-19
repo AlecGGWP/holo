@@ -289,7 +289,6 @@ impl MacVlanInterface {
         let net = InterfaceNet::new(&self.name, tx_channels)
             .expect("Failed to initialize VRRP tasks");
         self.net = Some(net);
-        println!("...");
     }
 }
 
