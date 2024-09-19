@@ -428,6 +428,18 @@ impl Interfaces {
         }
     }
 
+    // adds an IP address to an interface
+    pub(crate) async fn add_iface_address(
+        &self,
+        netlink_handle: &rtnetlink::Handle,
+        ifindex: u32,
+        addr: IpNetwork,
+    ) {
+        if self.get_by_ifindex(ifindex).is_some() {
+            netlink::addr_install(netlink_handle, ifindex, &addr).await;
+        }
+    }
+
     // Returns a reference to the interface corresponding to the given name.
     pub(crate) fn get_by_name(&self, ifname: &str) -> Option<&Interface> {
         self.name_tree

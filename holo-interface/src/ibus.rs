@@ -68,6 +68,17 @@ pub(crate) async fn process_msg(master: &mut Master, msg: IbusMsg) {
                 )
                 .await;
         }
+        IbusMsg::InterfaceIpAddRequest(msg) => {
+            println!("--");
+            let _ = master
+                .interfaces
+                .add_iface_address(
+                    &master.netlink_handle,
+                    msg.ifindex,
+                    msg.addr,
+                )
+                .await;
+        }
         // Ignore other events.
         _ => {}
     }

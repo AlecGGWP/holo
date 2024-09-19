@@ -17,7 +17,7 @@ use holo_northbound::configuration::{
 };
 use holo_northbound::yang::interfaces;
 use holo_utils::yang::DataNodeRefExt;
-use ipnetwork::Ipv4Network;
+use ipnetwork::{IpNetwork, Ipv4Network};
 
 use crate::instance::Instance;
 use crate::interface::{Interface, MacVlanInterface};
@@ -122,10 +122,8 @@ fn load_callbacks() -> Callbacks<Interface> {
         .path(interfaces::interface::ipv4::vrrp::vrrp_instance::virtual_ipv4_addresses::virtual_ipv4_address::PATH)
         .create_apply(|interface, args| {
             let vrid = args.list_entry.into_vrid().unwrap();
-            let instance = interface.instances.get_mut(&vrid).unwrap();
-
             let addr = args.dnode.get_prefix4_relative("ipv4-address").unwrap();
-            instance.config.virtual_addresses.insert(addr);
+            let _ = &interface.add_instance_virtual_address(vrid, IpNetwork::V4(addr));
         })
         .delete_apply(|interface, args| {
             let vrid = args.list_entry.into_vrid().unwrap();

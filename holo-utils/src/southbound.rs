@@ -86,6 +86,13 @@ pub struct MacvlanCreateMsg {
 
 #[derive(Clone, Debug)]
 #[derive(Deserialize, Serialize)]
+pub struct InterfaceIpAddRequestMsg {
+    pub ifindex: u32,
+    pub addr: IpNetwork,
+}
+
+#[derive(Clone, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct AddressMsg {
     pub ifname: String,
     pub addr: IpNetwork,

@@ -8,9 +8,12 @@ use std::net::Ipv4Addr;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use holo_utils::ibus::IbusSender;
 use holo_utils::task::{IntervalTask, TimeoutTask};
+use ipnetwork::IpNetwork;
 
 use crate::northbound::configuration::InstanceCfg;
+use crate::southbound;
 
 #[derive(Debug)]
 pub struct Instance {
@@ -133,6 +136,18 @@ impl Instance {
             (3_u32 * self.config.advertise_interval as u32) + skew_time as u32;
         self.state.skew_time = skew_time;
         self.state.master_down_interval = master_down;
+    }
+
+    // adds a new ip address to the virtual IP addresses
+    // while simultaneously adding it to the instance's macvlan address
+    pub(crate) fn add_virtual_address(
+        &self,
+        ibus_tx: &IbusSender,
+        addr: IpNetwork,
+    ) {
+        if let Some(ifindex) = self.config.mac_vlan.system.ifindex {
+            southbound::add_addr(ifindex, addr, ibus_tx);
+        }
     }
 }
 

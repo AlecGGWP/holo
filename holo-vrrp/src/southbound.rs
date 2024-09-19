@@ -6,7 +6,7 @@
 
 use holo_utils::ibus::{IbusMsg, IbusSender};
 use holo_utils::southbound::{
-    AddressMsg, InterfaceUpdateMsg, MacvlanCreateMsg,
+    AddressMsg, InterfaceIpAddRequestMsg, InterfaceUpdateMsg, MacvlanCreateMsg,
 };
 use ipnetwork::IpNetwork;
 
@@ -71,7 +71,6 @@ pub(crate) fn process_addr_del(iface: &mut Interface, msg: AddressMsg) {
     }
 }
 
-// tx messages
 pub(crate) fn create_macvlan_address(
     name: String,
     parent_name: String,
@@ -84,4 +83,9 @@ pub(crate) fn create_macvlan_address(
         mac_address: Some(mac_address),
     };
     let _ = ibus_tx.send(IbusMsg::CreateMacVlan(msg));
+}
+
+pub(crate) fn add_addr(ifindex: u32, addr: IpNetwork, ibus_tx: &IbusSender) {
+    let msg = InterfaceIpAddRequestMsg { ifindex, addr };
+    let _ = ibus_tx.send(IbusMsg::InterfaceIpAddRequest(msg));
 }

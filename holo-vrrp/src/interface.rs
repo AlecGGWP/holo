@@ -18,7 +18,7 @@ use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::southbound::InterfaceFlags;
 use holo_utils::task::Task;
 use holo_utils::{Receiver, Sender, UnboundedSender};
-use ipnetwork::Ipv4Network;
+use ipnetwork::{IpNetwork, Ipv4Network};
 use tokio::sync::mpsc;
 
 use crate::error::{Error, IoError};
@@ -200,6 +200,16 @@ impl Interface {
 
                 let _ = self.net.net_tx_packetp.send(msg);
             }
+        }
+    }
+
+    pub(crate) fn add_instance_virtual_address(
+        &self,
+        vrid: u8,
+        addr: IpNetwork,
+    ) {
+        if let Some(instance) = self.instances.get(&vrid) {
+            instance.add_virtual_address(&self.tx.ibus, addr);
         }
     }
 }
