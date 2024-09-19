@@ -9,7 +9,7 @@ use holo_utils::southbound::{
     AddressMsg, InterfaceIpAddRequestMsg, InterfaceIpDeleteRequestMsg,
     InterfaceUpdateMsg, MacvlanCreateMsg,
 };
-use ipnetwork::{IpNetwork, Ipv4Network};
+use ipnetwork::IpNetwork;
 
 use crate::interface::Interface;
 
@@ -66,7 +66,7 @@ pub(crate) fn process_addr_add(iface: &mut Interface, msg: AddressMsg) {
 
         if mvlan_iface.name == name {
             if let IpNetwork::V4(addr) = msg.addr {
-                instance.config.virtual_addresses.insert(addr.clone());
+                instance.config.virtual_addresses.insert(addr);
                 mvlan_iface.system.addresses.insert(addr);
             }
         }

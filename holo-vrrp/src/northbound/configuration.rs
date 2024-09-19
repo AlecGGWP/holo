@@ -7,7 +7,6 @@
 #![allow(clippy::derivable_impls)]
 
 use std::collections::BTreeSet;
-use std::net::Ipv4Addr;
 use std::sync::LazyLock as Lazy;
 
 use async_trait::async_trait;
@@ -132,10 +131,10 @@ fn load_callbacks() -> Callbacks<Interface> {
             let addr = IpNetwork::V4(addr);
             let _ = &interface.delete_instance_virtual_address(vrid, addr);
         })
-        .lookup(|interface, list_entry, dnode| {
+        .lookup(|_interface, list_entry, dnode| {
             let vrid = list_entry.into_vrid().unwrap();
             let addr = dnode.get_prefix4_relative("ipv4-address").unwrap();
-            return ListEntry::VirtualIpv4Addr(vrid, addr)  
+            ListEntry::VirtualIpv4Addr(vrid, addr)
         })
         .build()
 }
