@@ -209,7 +209,21 @@ impl Interface {
         addr: IpNetwork,
     ) {
         if let Some(instance) = self.instances.get(&vrid) {
-            instance.add_virtual_address(&self.tx.ibus, addr);
+            if let Some(ifindex) = instance.config.mac_vlan.system.ifindex {
+                southbound::addr_add(ifindex, addr, &self.tx.ibus);
+            }
+        }
+    }
+
+    pub(crate) fn delete_instance_virtual_address(
+        &self,
+        vrid: u8,
+        addr: IpNetwork,
+    ) {
+        if let Some(instance) = self.instances.get(&vrid) {
+            if let Some(ifindex) = instance.config.mac_vlan.system.ifindex {
+                southbound::addr_del(ifindex, addr, &self.tx.ibus);
+            }
         }
     }
 }

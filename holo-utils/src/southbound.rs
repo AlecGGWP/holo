@@ -93,6 +93,13 @@ pub struct InterfaceIpAddRequestMsg {
 
 #[derive(Clone, Debug)]
 #[derive(Deserialize, Serialize)]
+pub struct InterfaceIpDeleteRequestMsg {
+    pub ifindex: u32,
+    pub addr: IpNetwork,
+}
+
+#[derive(Clone, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct AddressMsg {
     pub ifname: String,
     pub addr: IpNetwork,

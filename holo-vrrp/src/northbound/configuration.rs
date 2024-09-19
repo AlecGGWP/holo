@@ -127,10 +127,8 @@ fn load_callbacks() -> Callbacks<Interface> {
         })
         .delete_apply(|interface, args| {
             let vrid = args.list_entry.into_vrid().unwrap();
-            let instance = interface.instances.get_mut(&vrid).unwrap();
-
             let addr = args.dnode.get_prefix4();
-            instance.config.virtual_addresses.remove(&addr);
+            let _ = &interface.delete_instance_virtual_address(vrid, IpNetwork::V4(addr));
         })
         .lookup(|_instance, _list_entry, _dnode| {
             ListEntry::None

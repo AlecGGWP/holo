@@ -137,18 +137,6 @@ impl Instance {
         self.state.skew_time = skew_time;
         self.state.master_down_interval = master_down;
     }
-
-    // adds a new ip address to the virtual IP addresses
-    // while simultaneously adding it to the instance's macvlan address
-    pub(crate) fn add_virtual_address(
-        &self,
-        ibus_tx: &IbusSender,
-        addr: IpNetwork,
-    ) {
-        if let Some(ifindex) = self.config.mac_vlan.system.ifindex {
-            southbound::add_addr(ifindex, addr, ibus_tx);
-        }
-    }
 }
 
 // ===== impl InstanceState =====

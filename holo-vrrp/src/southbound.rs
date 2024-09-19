@@ -6,9 +6,10 @@
 
 use holo_utils::ibus::{IbusMsg, IbusSender};
 use holo_utils::southbound::{
-    AddressMsg, InterfaceIpAddRequestMsg, InterfaceUpdateMsg, MacvlanCreateMsg,
+    AddressMsg, InterfaceIpAddRequestMsg, InterfaceIpDeleteRequestMsg,
+    InterfaceUpdateMsg, MacvlanCreateMsg,
 };
-use ipnetwork::IpNetwork;
+use ipnetwork::{IpNetwork, Ipv4Network};
 
 use crate::interface::Interface;
 
@@ -57,6 +58,19 @@ pub(crate) fn process_addr_add(iface: &mut Interface, msg: AddressMsg) {
 
         // TODO: trigger protocol event?
     }
+
+    // if the interface being updated is one of the macvlans
+    for (vrid, instance) in iface.instances.iter_mut() {
+        let name = format!("mvlan-vrrp-{}", vrid);
+        let mvlan_iface = &mut instance.config.mac_vlan;
+
+        if mvlan_iface.name == name {
+            if let IpNetwork::V4(addr) = msg.addr {
+                instance.config.virtual_addresses.insert(addr.clone());
+                mvlan_iface.system.addresses.insert(addr);
+            }
+        }
+    }
 }
 
 pub(crate) fn process_addr_del(iface: &mut Interface, msg: AddressMsg) {
@@ -85,7 +99,12 @@ pub(crate) fn create_macvlan_address(
     let _ = ibus_tx.send(IbusMsg::CreateMacVlan(msg));
 }
 
-pub(crate) fn add_addr(ifindex: u32, addr: IpNetwork, ibus_tx: &IbusSender) {
+pub(crate) fn addr_add(ifindex: u32, addr: IpNetwork, ibus_tx: &IbusSender) {
     let msg = InterfaceIpAddRequestMsg { ifindex, addr };
     let _ = ibus_tx.send(IbusMsg::InterfaceIpAddRequest(msg));
+}
+
+pub(crate) fn addr_del(ifindex: u32, addr: IpNetwork, ibus_tx: &IbusSender) {
+    let msg = InterfaceIpDeleteRequestMsg { ifindex, addr };
+    let _ = ibus_tx.send(IbusMsg::InterfaceIpDeleteRequest(msg));
 }
