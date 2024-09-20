@@ -20,7 +20,7 @@ use holo_utils::yang::DataNodeRefExt;
 use ipnetwork::{IpNetwork, Ipv4Network};
 
 use crate::instance::Instance;
-use crate::interface::{Interface, MacVlanInterface};
+use crate::interface::Interface;
 
 #[derive(Debug, Default, EnumAsInner)]
 pub enum ListEntry {
@@ -38,7 +38,7 @@ pub enum Event {
     InstanceCreate { vrid: u8 },
     InstanceDelete { vrid: u8 },
     VirtualAddressCreate { vrid: u8, addr: IpNetwork },
-    VirtualAddressDelete { vrid: u8, addr: IpNetwork }
+    VirtualAddressDelete { vrid: u8, addr: IpNetwork },
 }
 
 pub static VALIDATION_CALLBACKS: Lazy<ValidationCallbacks> =
@@ -54,7 +54,6 @@ pub struct InstanceCfg {
     pub priority: u8,
     pub advertise_interval: u8,
     pub virtual_addresses: BTreeSet<Ipv4Network>,
-    pub mac_vlan: MacVlanInterface,
 }
 
 // ===== callbacks =====
@@ -118,7 +117,7 @@ fn load_callbacks() -> Callbacks<Interface> {
         })
         .path(interfaces::interface::ipv4::vrrp::vrrp_instance::virtual_ipv4_addresses::virtual_ipv4_address::PATH)
         .create_apply(|_interface, args| {
-            let vrid = args.list_entry.into_vrid().unwrap(); 
+            let vrid = args.list_entry.into_vrid().unwrap();
             let addr = args.dnode.get_prefix4_relative("ipv4-address").unwrap();
             let event_queue = args.event_queue;
             event_queue.insert (
@@ -174,7 +173,7 @@ impl Provider for Interface {
                 self.create_instance(vrid);
 
                 // reminder to remove the following line.
-                // currently up due to state not being properly maintained on startup.  
+                // currently up due to state not being properly maintained on startup.
                 self.change_state(vrid, crate::instance::State::Backup);
                 let instance = Instance::new(vrid);
                 self.instances.insert(vrid, instance);
@@ -188,16 +187,6 @@ impl Provider for Interface {
             Event::VirtualAddressDelete { vrid, addr } => {
                 self.delete_instance_virtual_address(vrid, addr);
             }
-        }
-    }
-}
-
-// ===== impl InstanceCfg ====
-impl InstanceCfg {
-    pub fn new(vrid: u8) -> Self {
-        Self {
-            mac_vlan: MacVlanInterface::new(vrid),
-            ..Default::default()
         }
     }
 }
@@ -219,7 +208,6 @@ impl Default for InstanceCfg {
             priority,
             advertise_interval,
             virtual_addresses: Default::default(),
-            mac_vlan: MacVlanInterface::new(0),
         }
     }
 }

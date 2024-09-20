@@ -209,7 +209,7 @@ impl Interface {
         addr: IpNetwork,
     ) {
         if let Some(instance) = self.instances.get(&vrid) {
-            if let Some(ifindex) = instance.config.mac_vlan.system.ifindex {
+            if let Some(ifindex) = instance.mac_vlan.system.ifindex {
                 southbound::addr_add(ifindex, addr, &self.tx.ibus);
             }
         }
@@ -221,7 +221,7 @@ impl Interface {
         addr: IpNetwork,
     ) {
         if let Some(instance) = self.instances.get(&vrid) {
-            if let Some(ifindex) = instance.config.mac_vlan.system.ifindex {
+            if let Some(ifindex) = instance.mac_vlan.system.ifindex {
                 southbound::addr_del(ifindex, addr, &self.tx.ibus);
             }
         }

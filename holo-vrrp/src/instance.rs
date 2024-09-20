@@ -10,6 +10,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use holo_utils::task::{IntervalTask, TimeoutTask};
 
+use crate::interface::MacVlanInterface;
 use crate::northbound::configuration::InstanceCfg;
 
 #[derive(Debug)]
@@ -22,6 +23,9 @@ pub struct Instance {
 
     // timers
     pub timer: VrrpTimer,
+
+    // mvlan
+    pub mac_vlan: MacVlanInterface,
 }
 
 #[derive(Debug)]
@@ -100,9 +104,10 @@ pub struct Statistics {
 impl Instance {
     pub(crate) fn new(vrid: u8) -> Self {
         let mut inst = Instance {
-            config: InstanceCfg::new(vrid),
+            config: InstanceCfg::default(),
             state: InstanceState::new(),
             timer: VrrpTimer::Null,
+            mac_vlan: MacVlanInterface::new(vrid),
         };
         inst.set_advert_interval(inst.config.advertise_interval);
         inst

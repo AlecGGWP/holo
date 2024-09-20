@@ -28,7 +28,7 @@ pub(crate) fn process_iface_update(
         // update names for all macvlans
         for (vrid, instance) in iface.instances.iter_mut() {
             let name = format!("mvlan-vrrp-{}", vrid);
-            instance.config.mac_vlan.name = name;
+            instance.mac_vlan.name = name;
         }
         return;
     }
@@ -36,7 +36,7 @@ pub(crate) fn process_iface_update(
     // check if it is one of the macvlans being updated.
     for (vrid, instance) in iface.instances.iter_mut() {
         let name = format!("mvlan-vrrp-{}", vrid);
-        let mvlan_iface = &mut instance.config.mac_vlan;
+        let mvlan_iface = &mut instance.mac_vlan;
 
         if mvlan_iface.name == name {
             mvlan_iface.system.flags = msg.flags;
@@ -62,7 +62,7 @@ pub(crate) fn process_addr_add(iface: &mut Interface, msg: AddressMsg) {
     // if the interface being updated is one of the macvlans
     for (vrid, instance) in iface.instances.iter_mut() {
         let name = format!("mvlan-vrrp-{}", vrid);
-        let mvlan_iface = &mut instance.config.mac_vlan;
+        let mvlan_iface = &mut instance.mac_vlan;
 
         if mvlan_iface.name == name {
             if let IpNetwork::V4(addr) = msg.addr {
