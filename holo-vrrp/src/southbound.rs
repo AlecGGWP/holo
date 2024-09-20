@@ -85,7 +85,7 @@ pub(crate) fn process_addr_del(iface: &mut Interface, msg: AddressMsg) {
     }
 }
 
-pub(crate) fn create_macvlan_address(
+pub(crate) fn create_macvlan_iface(
     name: String,
     parent_name: String,
     mac_address: [u8; 6],
@@ -97,6 +97,10 @@ pub(crate) fn create_macvlan_address(
         mac_address: Some(mac_address),
     };
     let _ = ibus_tx.send(IbusMsg::CreateMacVlan(msg));
+}
+
+pub(crate) fn delete_iface(ifindex: u32, ibus_tx: &IbusSender) {
+    let _ = ibus_tx.send(IbusMsg::InterfaceDeleteRequest(ifindex));
 }
 
 pub(crate) fn addr_add(ifindex: u32, addr: IpNetwork, ibus_tx: &IbusSender) {

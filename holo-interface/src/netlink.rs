@@ -264,6 +264,17 @@ pub(crate) async fn macvlan_create(
     }
 }
 
+// Removes an interface completely from the system.
+//
+// At the moment, will mostly be used for uninstalling
+// Macvlan interfaces when we are removing a VRRP instance.
+pub(crate) async fn iface_delete(handle: &Handle, ifindex: u32) {
+    let request = handle.link().del(ifindex);
+    if let Err(err) = request.execute().await {
+        error!(%ifindex, %err, "failed to delete interface.");
+    }
+}
+
 pub(crate) async fn addr_install(
     handle: &Handle,
     ifindex: u32,

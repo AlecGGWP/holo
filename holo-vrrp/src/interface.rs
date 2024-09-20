@@ -118,12 +118,26 @@ impl Interface {
         //  `mvlan-vrrp{primary-interface-ifindex}{vrid}`
         let name = format!("mvlan-vrrp-{}", vrid);
         let mac_address: [u8; 6] = [0x00, 0x00, 0x5e, 0x00, 0x01, vrid];
-        southbound::create_macvlan_address(
+        southbound::create_macvlan_iface(
             name.clone(),
             self.name.clone(),
             mac_address, // virtual mac address
             &self.tx.ibus,
         );
+    }
+
+    pub(crate) fn delete_instance(&mut self, vrid: u8) {
+        let mvlan_ifindex: Option<u32>;
+        if let Some(instance) = self.instances.get(&vrid) {
+            mvlan_ifindex = instance.mac_vlan.system.ifindex;
+        } else {
+            return;
+        }
+
+        self.instances.remove(&vrid);
+        if let Some(ifindex) = mvlan_ifindex {
+            southbound::delete_iface(ifindex, &self.tx.ibus);
+        }
     }
 
     pub(crate) fn change_state(&mut self, vrid: u8, state: State) {

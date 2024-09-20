@@ -88,6 +88,12 @@ pub(crate) async fn process_msg(master: &mut Master, msg: IbusMsg) {
                 )
                 .await;
         }
+        IbusMsg::InterfaceDeleteRequest(ifindex) => {
+            let _ = master
+                .interfaces
+                .delete_iface(&master.netlink_handle, ifindex)
+                .await;
+        }
         // Ignore other events.
         _ => {}
     }

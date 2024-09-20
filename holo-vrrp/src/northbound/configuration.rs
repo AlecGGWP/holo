@@ -68,7 +68,6 @@ fn load_callbacks() -> Callbacks<Interface> {
         })
         .delete_apply(|_interface, args| {
             let vrid = args.list_entry.into_vrid().unwrap();
-
             let event_queue = args.event_queue;
             event_queue.insert(Event::InstanceDelete { vrid });
         })
@@ -179,7 +178,7 @@ impl Provider for Interface {
                 self.instances.insert(vrid, instance);
             }
             Event::InstanceDelete { vrid } => {
-                self.instances.remove(&vrid);
+                self.delete_instance(vrid);
             }
             Event::VirtualAddressCreate { vrid, addr } => {
                 self.add_instance_virtual_address(vrid, addr);

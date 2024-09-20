@@ -428,6 +428,16 @@ impl Interfaces {
         }
     }
 
+    pub(crate) async fn delete_iface(
+        &self,
+        netlink_handle: &rtnetlink::Handle,
+        ifindex: u32,
+    ) {
+        if self.get_by_ifindex(ifindex).is_some() {
+            let _ = netlink::iface_delete(netlink_handle, ifindex).await;
+        }
+    }
+
     // adds an IP address to an interface
     pub(crate) async fn add_iface_address(
         &self,

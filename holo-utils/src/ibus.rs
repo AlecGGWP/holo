@@ -66,6 +66,8 @@ pub enum IbusMsg {
     InterfaceIpAddRequest(InterfaceIpAddRequestMsg),
     // Request to delete an address to an interface.
     InterfaceIpDeleteRequest(InterfaceIpDeleteRequestMsg),
+    // Request to delete an interface
+    InterfaceDeleteRequest(u32),
     // Keychain update notification.
     KeychainUpd(Arc<Keychain>),
     // Keychain delete notification.
