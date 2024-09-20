@@ -37,6 +37,8 @@ pub enum Resource {}
 pub enum Event {
     InstanceCreate { vrid: u8 },
     InstanceDelete { vrid: u8 },
+    VirtualAddressCreate { vrid: u8, addr: IpNetwork },
+    VirtualAddressDelete { vrid: u8, addr: IpNetwork }
 }
 
 pub static VALIDATION_CALLBACKS: Lazy<ValidationCallbacks> =
@@ -60,15 +62,9 @@ pub struct InstanceCfg {
 fn load_callbacks() -> Callbacks<Interface> {
     CallbacksBuilder::<Interface>::default()
         .path(interfaces::interface::ipv4::vrrp::vrrp_instance::PATH)
-        .create_apply(|interface, args| {
+        .create_apply(|_interface, args| {
             let vrid = args.dnode.get_u8_relative("./vrid").unwrap();
-            interface.create_instance(vrid);
-
-            // reminder to remove the following line.
-            // currently up due to state not being properly maintained on startup.  
-            interface.change_state(vrid, crate::instance::State::Backup);
             let event_queue = args.event_queue;
-
             event_queue.insert(Event::InstanceCreate { vrid });
         })
         .delete_apply(|_interface, args| {
@@ -121,15 +117,18 @@ fn load_callbacks() -> Callbacks<Interface> {
             // Nothing to do.
         })
         .path(interfaces::interface::ipv4::vrrp::vrrp_instance::virtual_ipv4_addresses::virtual_ipv4_address::PATH)
-        .create_apply(|interface, args| {
-            let vrid = args.list_entry.into_vrid().unwrap();
+        .create_apply(|_interface, args| {
+            let vrid = args.list_entry.into_vrid().unwrap(); 
             let addr = args.dnode.get_prefix4_relative("ipv4-address").unwrap();
-            let _ = &interface.add_instance_virtual_address(vrid, IpNetwork::V4(addr));
+            let event_queue = args.event_queue;
+            event_queue.insert (
+                Event::VirtualAddressCreate { vrid, addr: IpNetwork::V4(addr) }
+            );
         })
-        .delete_apply(|interface, args| {
+        .delete_apply(|_interface, args| {
             let (vrid, addr) = args.list_entry.into_virtual_ipv4_addr().unwrap();
-            let addr = IpNetwork::V4(addr);
-            let _ = &interface.delete_instance_virtual_address(vrid, addr);
+            let event_queue = args.event_queue;
+            event_queue.insert(Event::VirtualAddressDelete { vrid, addr: IpNetwork::V4(addr) });
         })
         .lookup(|_interface, list_entry, dnode| {
             let vrid = list_entry.into_vrid().unwrap();
@@ -172,11 +171,22 @@ impl Provider for Interface {
     async fn process_event(&mut self, event: Event) {
         match event {
             Event::InstanceCreate { vrid } => {
+                self.create_instance(vrid);
+
+                // reminder to remove the following line.
+                // currently up due to state not being properly maintained on startup.  
+                self.change_state(vrid, crate::instance::State::Backup);
                 let instance = Instance::new(vrid);
                 self.instances.insert(vrid, instance);
             }
             Event::InstanceDelete { vrid } => {
                 self.instances.remove(&vrid);
+            }
+            Event::VirtualAddressCreate { vrid, addr } => {
+                self.add_instance_virtual_address(vrid, addr);
+            }
+            Event::VirtualAddressDelete { vrid, addr } => {
+                self.delete_instance_virtual_address(vrid, addr);
             }
         }
     }
