@@ -9,14 +9,20 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use holo_utils::task::{IntervalTask, TimeoutTask};
+use holo_utils::Sender;
 
 use crate::interface::MacVlanInterface;
 use crate::northbound::configuration::InstanceCfg;
-use crate::packet::VrrpPacket;
+use crate::packet::{ArpPacket, EthernetFrame, VrrpPacket};
+use crate::tasks;
+use crate::tasks::messages::input::MasterDownTimerMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
 #[derive(Debug)]
 pub struct Instance {
+    // vrid
+    pub vrid: u8,
+
     // Instance configuration data.
     pub config: InstanceCfg,
 
@@ -106,6 +112,7 @@ pub struct Statistics {
 impl Instance {
     pub(crate) fn new(vrid: u8) -> Self {
         let mut inst = Instance {
+            vrid,
             config: InstanceCfg::default(),
             state: InstanceState::new(),
             timer: VrrpTimer::Null,
@@ -142,7 +149,7 @@ impl Instance {
         self.state.master_down_interval = master_down;
     }
 
-    pub(crate) fn _send_vrrp_advert(&self) {
+    pub(crate) fn send_vrrp_advert(&self) {
         let packet = self.vrrp_packet();
         let msg = NetTxPacketMsg::Vrrp { packet };
 
@@ -172,6 +179,58 @@ impl Instance {
         };
         packet.generate_checksum();
         packet
+    }
+
+    pub(crate) fn send_gratuitous_arp(&self) {
+        // send a gratuitous for each of the
+        // virutal IP addresses
+        for addr in self.config.virtual_addresses.clone() {
+            let arp_packet = ArpPacket {
+                hw_type: 1,
+                // for Ipv4
+                proto_type: 0x0800,
+                // mac address length
+                hw_length: 6,
+                proto_length: 4,
+                operation: 1,
+                // sender hw address is virtual mac.
+                // https://datatracker.ietf.org/doc/html/rfc3768#section-7.3
+                sender_hw_address: self.mac_vlan.system.mac_address,
+                sender_proto_address: addr.ip().octets(),
+                target_hw_address: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff], // broadcast
+                target_proto_address: addr.ip().octets(),
+            };
+
+            let eth_frame = EthernetFrame {
+                ethertype: 0x806,
+                dst_mac: [0xff; 6],
+                src_mac: self.mac_vlan.system.mac_address,
+            };
+
+            let msg = NetTxPacketMsg::Arp {
+                name: self.mac_vlan.name.clone(),
+                eth_frame,
+                arp_packet,
+            };
+
+            if let Some(net) = &self.mac_vlan.net {
+                let _ = net.net_tx_packetp.send(msg);
+            }
+        }
+    }
+
+    pub(crate) fn change_state(
+        &mut self,
+        state: State,
+        tx: Sender<MasterDownTimerMsg>,
+    ) {
+        if state == State::Backup {
+            // change admin state of macVlan to down.
+        } else if state == State::Master {
+            // change admin state of macvlan to up.
+        }
+        self.state.state = state;
+        tasks::set_timer(self, tx);
     }
 }
 

@@ -22,7 +22,6 @@ use tokio::sync::mpsc;
 
 use crate::error::{Error, IoError};
 use crate::instance::{Instance, State};
-use crate::packet::{ArpPacket, EthernetFrame};
 use crate::tasks::messages::input::{MasterDownTimerMsg, VrrpNetRxPacketMsg};
 use crate::tasks::messages::output::NetTxPacketMsg;
 use crate::tasks::messages::{ProtocolInputMsg, ProtocolOutputMsg};
@@ -147,54 +146,10 @@ impl Interface {
                 // change admin state of MacVlan to up.
             }
             instance.state.state = state;
-            tasks::set_timer(self, vrid);
-        }
-    }
-
-    pub(crate) fn send_vrrp_advert(&self, vrid: u8) {
-        if let Some(instance) = self.instances.get(&vrid) {
-            let packet = instance.vrrp_packet();
-            let msg = NetTxPacketMsg::Vrrp { packet };
-            let _ = self.net.net_tx_packetp.send(msg);
-        }
-    }
-
-    pub(crate) fn send_gratuitous_arp(&self, vrid: u8) {
-        if let Some(instance) = self.instances.get(&vrid) {
-            // send a gratuitous for each of the
-            // virutal IP addresses
-            for addr in instance.config.virtual_addresses.clone() {
-                let arp_packet = ArpPacket {
-                    hw_type: 1,
-                    // for Ipv4
-                    proto_type: 0x0800,
-                    // mac address length
-                    hw_length: 6,
-                    proto_length: 4,
-                    operation: 1,
-                    // sender hw address is virtual mac.
-                    // https://datatracker.ietf.org/doc/html/rfc3768#section-7.3
-                    sender_hw_address: [0x00, 0x00, 0x5e, 0x00, 0x01, vrid],
-                    sender_proto_address: addr.ip().octets(),
-                    target_hw_address: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff], // broadcast
-                    target_proto_address: addr.ip().octets(),
-                };
-
-                let mac_addr = self.system.mac_address;
-                let eth_frame = EthernetFrame {
-                    ethertype: 0x806,
-                    dst_mac: [0xff; 6],
-                    src_mac: mac_addr,
-                };
-
-                let msg = NetTxPacketMsg::Arp {
-                    name: self.name.clone(),
-                    eth_frame,
-                    arp_packet,
-                };
-
-                let _ = self.net.net_tx_packetp.send(msg);
-            }
+            tasks::set_timer(
+                instance,
+                self.tx.protocol_input.master_down_timer_tx.clone(),
+            );
         }
     }
 

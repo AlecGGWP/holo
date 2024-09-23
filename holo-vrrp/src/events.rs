@@ -80,10 +80,13 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
     match action {
         VrrpAction::Initialize(_src, pkt) => {
             let vrid = pkt.vrid;
+
             if vrid == 255 {
-                interface.send_vrrp_advert(vrid);
-                interface.send_gratuitous_arp(vrid);
-                interface.change_state(vrid, State::Master);
+                if let Some(instance) = interface.instances.get_mut(&vrid) {
+                    instance.send_vrrp_advert();
+                    instance.send_gratuitous_arp();
+                    interface.change_state(vrid, State::Master);
+                }
             } else {
                 interface.change_state(vrid, State::Backup);
             }
@@ -95,7 +98,15 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
                 if pkt.priority == 0 {
                     let duration =
                         Duration::from_secs_f32(instance.state.skew_time);
-                    tasks::set_master_down_timer(interface, vrid, duration);
+                    tasks::set_master_down_timer(
+                        instance,
+                        duration,
+                        interface
+                            .tx
+                            .protocol_input
+                            .master_down_timer_tx
+                            .clone(),
+                    );
                 } else {
                     // RFC 3768 Section 6.4.2
                     // If Preempt Mode if False, or if the priority in the ADVERTISEMENT is
@@ -113,10 +124,10 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
         VrrpAction::Master(src, pkt) => {
             let vrid = pkt.vrid;
             let mut send_ad = false;
+            let tx = interface.tx.protocol_input.master_down_timer_tx.clone();
             if let Some(instance) = interface.instances.get_mut(&vrid) {
                 if pkt.priority == 0 {
                     send_ad = true;
-
                     instance.reset_timer();
                 }
                 //If the Priority in the ADVERTISEMENT is greater than the
@@ -135,14 +146,12 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
                                 .unwrap()
                                 .network())
                 {
-                    interface.change_state(vrid, State::Backup);
-                } else {
-                    return;
+                    instance.change_state(State::Backup, tx);
                 }
-            }
 
-            if send_ad {
-                interface.send_vrrp_advert(vrid);
+                if send_ad {
+                    instance.send_vrrp_advert();
+                }
             }
         }
     }
@@ -155,8 +164,11 @@ pub(crate) fn handle_master_down_timer(
     interface: &mut Interface,
     vrid: u8,
 ) -> Result<(), Error> {
-    interface.send_vrrp_advert(vrid);
-    interface.send_gratuitous_arp(vrid);
+    if let Some(instance) = interface.instances.get_mut(&vrid) {
+        instance.send_vrrp_advert();
+        instance.send_gratuitous_arp();
+    }
+
     interface.change_state(vrid, State::Master);
 
     Ok(())
