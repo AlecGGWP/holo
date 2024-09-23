@@ -11,6 +11,7 @@ use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::task::{IntervalTask, Task, TimeoutTask};
 use holo_utils::{Sender, UnboundedReceiver};
 use messages::input::MasterDownTimerMsg;
+use messages::output::NetTxPacketMsg;
 use tracing::{debug_span, Instrument};
 
 use crate::instance::{Instance, VrrpTimer};
@@ -176,7 +177,7 @@ pub(crate) fn net_tx(
 // handling the timers...
 pub(crate) fn set_timer(
     instance: &mut Instance,
-    tx: Sender<MasterDownTimerMsg>,
+    master_down_tx: Sender<MasterDownTimerMsg>,
 ) {
     match instance.state.state {
         crate::instance::State::Initialize => {
@@ -185,17 +186,31 @@ pub(crate) fn set_timer(
         crate::instance::State::Backup => {
             let duration =
                 Duration::from_secs(instance.state.master_down_interval as u64);
-            set_master_down_timer(instance, duration, tx);
+            set_master_down_timer(instance, duration, master_down_tx);
         }
+
+        // in case we are Master, we will be sending VRRP advertisements
+        // every ADVERT_INTERVAL seconds until otherwise.
         crate::instance::State::Master => {
-            let timer = IntervalTask::new(
-                Duration::from_secs(instance.config.advertise_interval as u64),
-                true,
-                move || async move {
-                    todo!("send VRRP advertisement");
-                },
-            );
-            instance.timer = VrrpTimer::AdverTimer(timer);
+            let packet = instance.vrrp_packet();
+            if let Some(net) = &instance.mac_vlan.net {
+                let net_tx = net.net_tx_packetp.clone();
+                let timer = IntervalTask::new(
+                    Duration::from_secs(
+                        instance.config.advertise_interval as u64,
+                    ),
+                    true,
+                    move || {
+                        let net_tx = net_tx.clone();
+                        let packet = packet.clone();
+                        async move {
+                            let msg = NetTxPacketMsg::Vrrp { packet };
+                            let _ = net_tx.send(msg);
+                        }
+                    },
+                );
+                instance.timer = VrrpTimer::AdverTimer(timer);
+            }
         }
     }
 }

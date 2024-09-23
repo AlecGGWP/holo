@@ -222,15 +222,16 @@ impl Instance {
     pub(crate) fn change_state(
         &mut self,
         state: State,
-        tx: Sender<MasterDownTimerMsg>,
+        master_down_tx: Sender<MasterDownTimerMsg>,
     ) {
         if state == State::Backup {
-            // change admin state of macVlan to down.
+            // TODO: change admin state of macVlan to down.
         } else if state == State::Master {
-            // change admin state of macvlan to up.
+            // TODO: change admin state of macvlan to up.
         }
+
         self.state.state = state;
-        tasks::set_timer(self, tx);
+        tasks::set_timer(self, master_down_tx);
     }
 }
 

@@ -85,7 +85,14 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
                 if let Some(instance) = interface.instances.get_mut(&vrid) {
                     instance.send_vrrp_advert();
                     instance.send_gratuitous_arp();
-                    interface.change_state(vrid, State::Master);
+                    instance.change_state(
+                        State::Master,
+                        interface
+                            .tx
+                            .protocol_input
+                            .master_down_timer_tx
+                            .clone(),
+                    );
                 }
             } else {
                 interface.change_state(vrid, State::Backup);
@@ -124,7 +131,8 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
         VrrpAction::Master(src, pkt) => {
             let vrid = pkt.vrid;
             let mut send_ad = false;
-            let tx = interface.tx.protocol_input.master_down_timer_tx.clone();
+            let master_down_timer_tx =
+                interface.tx.protocol_input.master_down_timer_tx.clone();
             if let Some(instance) = interface.instances.get_mut(&vrid) {
                 if pkt.priority == 0 {
                     send_ad = true;
@@ -146,7 +154,7 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
                                 .unwrap()
                                 .network())
                 {
-                    instance.change_state(State::Backup, tx);
+                    instance.change_state(State::Backup, master_down_timer_tx);
                 }
 
                 if send_ad {

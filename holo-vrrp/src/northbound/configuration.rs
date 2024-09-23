@@ -19,7 +19,6 @@ use holo_northbound::yang::interfaces;
 use holo_utils::yang::DataNodeRefExt;
 use ipnetwork::{IpNetwork, Ipv4Network};
 
-use crate::instance::Instance;
 use crate::interface::Interface;
 
 #[derive(Debug, Default, EnumAsInner)]
@@ -170,12 +169,14 @@ impl Provider for Interface {
         match event {
             Event::InstanceCreate { vrid } => {
                 self.create_instance(vrid);
+                let instance = self.instances.get_mut(&vrid).unwrap();
 
                 // reminder to remove the following line.
                 // currently up due to state not being properly maintained on startup.
-                self.change_state(vrid, crate::instance::State::Backup);
-                let instance = Instance::new(vrid);
-                self.instances.insert(vrid, instance);
+                let _ = instance.change_state(
+                    crate::instance::State::Backup,
+                    self.tx.protocol_input.master_down_timer_tx.clone(),
+                );
             }
             Event::InstanceDelete { vrid } => {
                 self.delete_instance(vrid);
