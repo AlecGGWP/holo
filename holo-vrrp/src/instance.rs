@@ -12,6 +12,8 @@ use holo_utils::task::{IntervalTask, TimeoutTask};
 
 use crate::interface::MacVlanInterface;
 use crate::northbound::configuration::InstanceCfg;
+use crate::packet::VrrpPacket;
+use crate::tasks::messages::output::NetTxPacketMsg;
 
 #[derive(Debug)]
 pub struct Instance {
@@ -138,6 +140,38 @@ impl Instance {
             (3_u32 * self.config.advertise_interval as u32) + skew_time as u32;
         self.state.skew_time = skew_time;
         self.state.master_down_interval = master_down;
+    }
+
+    pub(crate) fn _send_vrrp_advert(&self) {
+        let packet = self.vrrp_packet();
+        let msg = NetTxPacketMsg::Vrrp { packet };
+
+        if let Some(net) = &self.mac_vlan.net {
+            let _ = net.net_tx_packetp.send(msg);
+        }
+    }
+
+    pub(crate) fn vrrp_packet(&self) -> VrrpPacket {
+        let mut ip_addresses: Vec<Ipv4Addr> = vec![];
+        for addr in self.config.virtual_addresses.clone() {
+            ip_addresses.push(addr.ip());
+        }
+
+        let mut packet = VrrpPacket {
+            version: 2,
+            hdr_type: 1,
+            vrid: u8::default(),
+            priority: self.config.priority,
+            count_ip: self.config.virtual_addresses.len() as u8,
+            auth_type: 0,
+            adver_int: self.config.advertise_interval,
+            checksum: 0,
+            ip_addresses,
+            auth_data: 0,
+            auth_data2: 0,
+        };
+        packet.generate_checksum();
+        packet
     }
 }
 

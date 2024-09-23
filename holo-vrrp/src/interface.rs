@@ -5,7 +5,6 @@
 //
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -23,7 +22,7 @@ use tokio::sync::mpsc;
 
 use crate::error::{Error, IoError};
 use crate::instance::{Instance, State};
-use crate::packet::{ArpPacket, EthernetFrame, VrrpPacket};
+use crate::packet::{ArpPacket, EthernetFrame};
 use crate::tasks::messages::input::{MasterDownTimerMsg, VrrpNetRxPacketMsg};
 use crate::tasks::messages::output::NetTxPacketMsg;
 use crate::tasks::messages::{ProtocolInputMsg, ProtocolOutputMsg};
@@ -154,25 +153,7 @@ impl Interface {
 
     pub(crate) fn send_vrrp_advert(&self, vrid: u8) {
         if let Some(instance) = self.instances.get(&vrid) {
-            let mut ip_addresses: Vec<Ipv4Addr> = vec![];
-            for addr in &instance.config.virtual_addresses {
-                ip_addresses.push(addr.ip());
-            }
-
-            let mut packet = VrrpPacket {
-                version: 2,
-                hdr_type: 1,
-                vrid: u8::default(),
-                priority: instance.config.priority,
-                count_ip: instance.config.virtual_addresses.len() as u8,
-                auth_type: 0,
-                adver_int: instance.config.advertise_interval,
-                checksum: 0,
-                ip_addresses,
-                auth_data: 0,
-                auth_data2: 0,
-            };
-            packet.generate_checksum();
+            let packet = instance.vrrp_packet();
             let msg = NetTxPacketMsg::Vrrp { packet };
             let _ = self.net.net_tx_packetp.send(msg);
         }
