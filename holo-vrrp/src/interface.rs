@@ -154,13 +154,26 @@ impl Interface {
     }
 
     pub(crate) fn add_instance_virtual_address(
-        &self,
+        &mut self,
         vrid: u8,
-        addr: IpNetwork,
+        addr: Ipv4Network,
     ) {
-        if let Some(instance) = self.instances.get(&vrid) {
+        if let Some(instance) = self.instances.get_mut(&vrid) {
+            instance.config.virtual_addresses.insert(addr);
+
+            // in order to update the virtual addresses being sent in subsequent
+            // requests, we will update the timer to have the updated timers with the relevant
+            // information.
+            tasks::set_timer(
+                instance,
+                self.tx.protocol_input.master_down_timer_tx.clone(),
+            );
             if let Some(ifindex) = instance.mac_vlan.system.ifindex {
-                southbound::addr_add(ifindex, addr, &self.tx.ibus);
+                southbound::addr_add(
+                    ifindex,
+                    IpNetwork::V4(addr),
+                    &self.tx.ibus,
+                );
             }
         }
     }
@@ -168,11 +181,15 @@ impl Interface {
     pub(crate) fn delete_instance_virtual_address(
         &self,
         vrid: u8,
-        addr: IpNetwork,
+        addr: Ipv4Network,
     ) {
         if let Some(instance) = self.instances.get(&vrid) {
             if let Some(ifindex) = instance.mac_vlan.system.ifindex {
-                southbound::addr_del(ifindex, addr, &self.tx.ibus);
+                southbound::addr_del(
+                    ifindex,
+                    IpNetwork::V4(addr),
+                    &self.tx.ibus,
+                );
             }
         }
     }

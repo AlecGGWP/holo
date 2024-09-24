@@ -17,7 +17,7 @@ use holo_northbound::configuration::{
 };
 use holo_northbound::yang::interfaces;
 use holo_utils::yang::DataNodeRefExt;
-use ipnetwork::{IpNetwork, Ipv4Network};
+use ipnetwork::Ipv4Network;
 
 use crate::interface::Interface;
 
@@ -36,8 +36,8 @@ pub enum Resource {}
 pub enum Event {
     InstanceCreate { vrid: u8 },
     InstanceDelete { vrid: u8 },
-    VirtualAddressCreate { vrid: u8, addr: IpNetwork },
-    VirtualAddressDelete { vrid: u8, addr: IpNetwork },
+    VirtualAddressCreate { vrid: u8, addr: Ipv4Network },
+    VirtualAddressDelete { vrid: u8, addr: Ipv4Network },
 }
 
 pub static VALIDATION_CALLBACKS: Lazy<ValidationCallbacks> =
@@ -119,13 +119,13 @@ fn load_callbacks() -> Callbacks<Interface> {
             let addr = args.dnode.get_prefix4_relative("ipv4-address").unwrap();
             let event_queue = args.event_queue;
             event_queue.insert (
-                Event::VirtualAddressCreate { vrid, addr: IpNetwork::V4(addr) }
+                Event::VirtualAddressCreate { vrid, addr }
             );
         })
         .delete_apply(|_interface, args| {
             let (vrid, addr) = args.list_entry.into_virtual_ipv4_addr().unwrap();
             let event_queue = args.event_queue;
-            event_queue.insert(Event::VirtualAddressDelete { vrid, addr: IpNetwork::V4(addr) });
+            event_queue.insert(Event::VirtualAddressDelete { vrid, addr });
         })
         .lookup(|_interface, list_entry, dnode| {
             let vrid = list_entry.into_vrid().unwrap();
