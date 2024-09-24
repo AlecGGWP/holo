@@ -15,6 +15,7 @@ use messages::output::NetTxPacketMsg;
 use tracing::{debug_span, Instrument};
 
 use crate::instance::{Instance, VrrpTimer};
+use crate::interface::Interface;
 use crate::network;
 
 //
@@ -176,25 +177,29 @@ pub(crate) fn net_tx(
 
 // handling the timers...
 pub(crate) fn set_timer(
-    instance: &mut Instance,
+    interface: &mut Interface,
+    vrid: u8,
     master_down_tx: Sender<MasterDownTimerMsg>,
 ) {
-    match instance.state.state {
-        crate::instance::State::Initialize => {
-            instance.timer = VrrpTimer::Null;
-        }
-        crate::instance::State::Backup => {
-            let duration =
-                Duration::from_secs(instance.state.master_down_interval as u64);
-            set_master_down_timer(instance, duration, master_down_tx);
-        }
+    // the net producer used for sending VRRP messages outside.
+    let net_tx = interface.net.net_tx_packetp.clone();
 
-        // in case we are Master, we will be sending VRRP advertisements
-        // every ADVERT_INTERVAL seconds until otherwise.
-        crate::instance::State::Master => {
-            let packet = instance.vrrp_packet();
-            if let Some(net) = &instance.mac_vlan.net {
-                let net_tx = net.net_tx_packetp.clone();
+    if let Some(instance) = interface.instances.get_mut(&vrid) {
+        match instance.state.state {
+            crate::instance::State::Initialize => {
+                instance.timer = VrrpTimer::Null;
+            }
+            crate::instance::State::Backup => {
+                let duration = Duration::from_secs(
+                    instance.state.master_down_interval as u64,
+                );
+                set_master_down_timer(instance, duration, master_down_tx);
+            }
+
+            // in case we are Master, we will be sending VRRP advertisements
+            // every ADVERT_INTERVAL seconds until otherwise.
+            crate::instance::State::Master => {
+                let packet = instance.vrrp_packet();
                 let timer = IntervalTask::new(
                     Duration::from_secs(
                         instance.config.advertise_interval as u64,
@@ -214,7 +219,6 @@ pub(crate) fn set_timer(
         }
     }
 }
-
 // ==== Set Master Down Timer ====
 pub(crate) fn set_master_down_timer(
     instance: &mut Instance,

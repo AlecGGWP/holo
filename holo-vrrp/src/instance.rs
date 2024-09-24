@@ -9,13 +9,10 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use holo_utils::task::{IntervalTask, TimeoutTask};
-use holo_utils::Sender;
 
 use crate::interface::MacVlanInterface;
 use crate::northbound::configuration::InstanceCfg;
 use crate::packet::{ArpPacket, EthernetFrame, VrrpPacket};
-use crate::tasks;
-use crate::tasks::messages::input::MasterDownTimerMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
 #[derive(Debug)]
@@ -149,15 +146,6 @@ impl Instance {
         self.state.master_down_interval = master_down;
     }
 
-    pub(crate) fn send_vrrp_advert(&self) {
-        let packet = self.vrrp_packet();
-        let msg = NetTxPacketMsg::Vrrp { packet };
-
-        if let Some(net) = &self.mac_vlan.net {
-            let _ = net.net_tx_packetp.send(msg);
-        }
-    }
-
     pub(crate) fn vrrp_packet(&self) -> VrrpPacket {
         let mut ip_addresses: Vec<Ipv4Addr> = vec![];
         for addr in self.config.virtual_addresses.clone() {
@@ -217,21 +205,6 @@ impl Instance {
                 let _ = net.net_tx_packetp.send(msg);
             }
         }
-    }
-
-    pub(crate) fn change_state(
-        &mut self,
-        state: State,
-        master_down_tx: Sender<MasterDownTimerMsg>,
-    ) {
-        if state == State::Backup {
-            // TODO: change admin state of macVlan to down.
-        } else if state == State::Master {
-            // TODO: change admin state of macvlan to up.
-        }
-
-        self.state.state = state;
-        tasks::set_timer(self, master_down_tx);
     }
 }
 

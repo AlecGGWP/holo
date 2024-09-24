@@ -147,7 +147,8 @@ impl Interface {
             }
             instance.state.state = state;
             tasks::set_timer(
-                instance,
+                self,
+                vrid,
                 self.tx.protocol_input.master_down_timer_tx.clone(),
             );
         }
@@ -158,16 +159,9 @@ impl Interface {
         vrid: u8,
         addr: Ipv4Network,
     ) {
-        if let Some(instance) = self.instances.get_mut(&vrid) {
+        if let Some(instance) = self.instances.get_mut(&vrid).take() {
             instance.config.virtual_addresses.insert(addr);
 
-            // in order to update the virtual addresses being sent in subsequent
-            // requests, we will update the timer to have the updated timers with the relevant
-            // information.
-            tasks::set_timer(
-                instance,
-                self.tx.protocol_input.master_down_timer_tx.clone(),
-            );
             if let Some(ifindex) = instance.mac_vlan.system.ifindex {
                 southbound::addr_add(
                     ifindex,
@@ -175,6 +169,14 @@ impl Interface {
                     &self.tx.ibus,
                 );
             }
+            // in order to update the virtual addresses being sent in subsequent
+            // requests, we will update the timer to have the updated timers with the relevant
+            // information.
+            tasks::set_timer(
+                self,
+                vrid,
+                self.tx.protocol_input.master_down_timer_tx.clone(),
+            );
         }
     }
 
@@ -191,6 +193,14 @@ impl Interface {
                     &self.tx.ibus,
                 );
             }
+        }
+    }
+
+    pub(crate) fn send_vrrp_advert(&self, vrid: u8) {
+        if let Some(instance) = self.instances.get(&vrid) {
+            let packet = instance.vrrp_packet();
+            let msg = NetTxPacketMsg::Vrrp { packet };
+            let _ = self.net.net_tx_packetp.send(msg);
         }
     }
 }

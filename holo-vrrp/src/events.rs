@@ -82,17 +82,12 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
             let vrid = pkt.vrid;
 
             if vrid == 255 {
-                if let Some(instance) = interface.instances.get_mut(&vrid) {
-                    instance.send_vrrp_advert();
+                interface.send_vrrp_advert(vrid);
+                interface.change_state(vrid, State::Master);
+                if let Some(instance) =
+                    interface.instances.get_mut(&vrid).take()
+                {
                     instance.send_gratuitous_arp();
-                    instance.change_state(
-                        State::Master,
-                        interface
-                            .tx
-                            .protocol_input
-                            .master_down_timer_tx
-                            .clone(),
-                    );
                 }
             } else {
                 interface.change_state(vrid, State::Backup);
@@ -131,9 +126,7 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
         VrrpAction::Master(src, pkt) => {
             let vrid = pkt.vrid;
             let mut send_ad = false;
-            let master_down_timer_tx =
-                interface.tx.protocol_input.master_down_timer_tx.clone();
-            if let Some(instance) = interface.instances.get_mut(&vrid) {
+            if let Some(instance) = interface.instances.get_mut(&vrid).take() {
                 if pkt.priority == 0 {
                     send_ad = true;
                     instance.reset_timer();
@@ -154,12 +147,12 @@ fn handle_vrrp_actions(interface: &mut Interface, action: VrrpAction) {
                                 .unwrap()
                                 .network())
                 {
-                    instance.change_state(State::Backup, master_down_timer_tx);
+                    interface.change_state(vrid, State::Backup);
                 }
+            }
 
-                if send_ad {
-                    instance.send_vrrp_advert();
-                }
+            if send_ad {
+                interface.send_vrrp_advert(vrid);
             }
         }
     }
@@ -172,8 +165,8 @@ pub(crate) fn handle_master_down_timer(
     interface: &mut Interface,
     vrid: u8,
 ) -> Result<(), Error> {
+    interface.send_vrrp_advert(vrid);
     if let Some(instance) = interface.instances.get_mut(&vrid) {
-        instance.send_vrrp_advert();
         instance.send_gratuitous_arp();
     }
 

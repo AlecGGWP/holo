@@ -169,14 +169,10 @@ impl Provider for Interface {
         match event {
             Event::InstanceCreate { vrid } => {
                 self.create_instance(vrid);
-                let instance = self.instances.get_mut(&vrid).unwrap();
 
                 // reminder to remove the following line.
                 // currently up due to state not being properly maintained on startup.
-                let _ = instance.change_state(
-                    crate::instance::State::Backup,
-                    self.tx.protocol_input.master_down_timer_tx.clone(),
-                );
+                self.change_state(vrid, crate::instance::State::Backup);
             }
             Event::InstanceDelete { vrid } => {
                 self.delete_instance(vrid);
