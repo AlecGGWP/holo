@@ -8,10 +8,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bytes::{BufMut, BytesMut};
 use holo_protocol::{
     InstanceChannelsTx, InstanceShared, MessageReceiver, ProtocolInstance,
 };
 use holo_utils::ibus::IbusMsg;
+use holo_utils::ip::AddressFamily;
 use holo_utils::protocol::Protocol;
 use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::southbound::InterfaceFlags;
@@ -198,8 +200,26 @@ impl Interface {
 
     pub(crate) fn send_vrrp_advert(&self, vrid: u8) {
         if let Some(instance) = self.instances.get(&vrid) {
-            let packet = instance.vrrp_packet();
-            let msg = NetTxPacketMsg::Vrrp { packet };
+            let mut buf = BytesMut::new();
+
+            // ethernet frame
+            let eth_frame: &[u8] = &instance.advert_ether_frame().encode();
+            buf.put(eth_frame);
+
+            // ip packet
+            let ip_pkt: &[u8] = &instance
+                .adver_ipv4_pkt(self.system.addresses.first().unwrap().ip())
+                .encode();
+            buf.put(ip_pkt);
+
+            // vrrp packet
+            let vrrp_pkt: &[u8] = &instance.adver_vrrp_pkt().encode();
+            buf.put(vrrp_pkt);
+
+            let msg = NetTxPacketMsg::Vrrp {
+                ifname: instance.mac_vlan.name.clone(),
+                buf: buf.to_vec(),
+            };
             let _ = self.net.net_tx_packetp.send(msg);
         }
     }
@@ -230,6 +250,15 @@ impl ProtocolInstance for Interface {
             tx,
             shared,
         }
+    }
+
+    async fn init(&mut self) {
+        // request for details of the master interface
+        // to be sent so we can update our details.
+        let _ = self.tx.ibus.send(IbusMsg::InterfaceQuery {
+            ifname: self.name.clone(),
+            af: Some(AddressFamily::Ipv4),
+        });
     }
 
     async fn process_ibus_msg(&mut self, msg: IbusMsg) {
@@ -300,13 +329,25 @@ impl InterfaceNet {
         ifname: &str,
         instance_channels_tx: &InstanceChannelsTx<Interface>,
     ) -> Result<Self, IoError> {
-        // Create raw sockets.
-        let socket_vrrp = network::socket_vrrp(ifname)
+        // create socket_vrrp_rx and socket_vrrp_tx
+        // Currently being created separately so that we can customize
+        // our vrrp sockets with some virtual fields in the headers
+        // when sending out the VRRP advertisements
+        let socket_vrrp_rx = network::socket_vrrp_rx(ifname)
             .map_err(IoError::SocketError)
             .and_then(|socket| {
                 AsyncFd::new(socket).map_err(IoError::SocketError)
             })
             .map(Arc::new)?;
+
+        // tx will change the creation to happen in it's own function.
+        let socket_vrrp_tx = network::socket_vrrp_tx(ifname)
+            .map_err(IoError::SocketError)
+            .and_then(|socket| {
+                AsyncFd::new(socket).map_err(IoError::SocketError)
+            })
+            .map(Arc::new)?;
+
         let socket_arp = network::socket_arp(ifname)
             .map_err(IoError::SocketError)
             .and_then(|socket| {
@@ -317,19 +358,19 @@ impl InterfaceNet {
         // Start network Tx/Rx tasks.
         let (net_tx_packetp, net_tx_packetc) = mpsc::unbounded_channel();
         let net_tx_task = tasks::net_tx(
-            socket_vrrp.clone(),
+            socket_vrrp_tx,
             socket_arp.clone(),
             net_tx_packetc,
             #[cfg(feature = "testing")]
             &instance_channels_tx.protocol_output,
         );
         let vrrp_net_rx_task = tasks::vrrp_net_rx(
-            socket_vrrp.clone(),
+            socket_vrrp_rx.clone(),
             &instance_channels_tx.protocol_input.vrrp_net_packet_tx,
         );
 
         Ok(InterfaceNet {
-            socket_vrrp,
+            socket_vrrp: socket_vrrp_rx,
             socket_arp,
             _net_tx_task: net_tx_task,
             _vrrp_net_rx_task: vrrp_net_rx_task,

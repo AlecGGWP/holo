@@ -5,17 +5,15 @@
 //
 
 use std::ffi::CString;
-//use std::io;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::Ipv4Addr;
 use std::os::fd::AsRawFd;
 use std::sync::Arc;
 
-//use holo_utils::socket::{AsyncFd, Socket};
+use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::{capabilities, Sender, UnboundedReceiver};
-use libc::{if_nametoindex, AF_PACKET, ETH_P_ARP};
+use libc::{if_nametoindex, AF_PACKET, ETH_P_ARP, ETH_P_IP};
 use nix::sys::socket;
-use socket2::{Domain, InterfaceIndexOrAddress, Protocol, Socket, Type};
-use tokio::io::unix::AsyncFd;
+use socket2::{Domain, InterfaceIndexOrAddress, Protocol, Type};
 use tokio::sync::mpsc::error::SendError;
 
 use crate::error::IoError;
@@ -23,7 +21,26 @@ use crate::packet::{ArpPacket, EthernetFrame, Ipv4Packet, VrrpPacket};
 use crate::tasks::messages::input::VrrpNetRxPacketMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
-pub fn socket_vrrp(ifname: &str) -> Result<Socket, std::io::Error> {
+pub fn socket_vrrp_tx(ifname: &str) -> Result<Socket, std::io::Error> {
+    #[cfg(not(feature = "testing"))]
+    {
+        let sock = capabilities::raise(|| {
+            Socket::new(Domain::PACKET, Type::RAW, Some(Protocol::from(112)))
+        })?;
+
+        capabilities::raise(|| sock.bind_device(Some(ifname.as_bytes())))?;
+        capabilities::raise(|| sock.set_broadcast(true))?;
+        capabilities::raise(|| sock.set_nonblocking(true))?;
+
+        Ok(sock)
+    }
+    #[cfg(feature = "testing")]
+    {
+        Ok(Socket {})
+    }
+}
+
+pub fn socket_vrrp_rx(ifname: &str) -> Result<Socket, std::io::Error> {
     #[cfg(not(feature = "testing"))]
     {
         let sock = capabilities::raise(|| {
@@ -67,18 +84,41 @@ pub fn socket_arp(ifname: &str) -> Result<Socket, std::io::Error> {
 
 #[cfg(not(feature = "testing"))]
 pub(crate) async fn send_packet_vrrp(
-    socket: &AsyncFd<Socket>,
-    packet: VrrpPacket,
+    sock: &AsyncFd<Socket>,
+    ifname: &str,
+    buf: &[u8],
 ) -> Result<usize, IoError> {
-    let buf: &[u8] = &packet.encode();
-    let saddr = SocketAddrV4::new(Ipv4Addr::new(224, 0, 0, 8), 0);
+    let c_ifname = CString::new(ifname).unwrap();
 
-    socket
-        .async_io(tokio::io::Interest::WRITABLE, |sock| {
-            sock.send_to(buf, &saddr.into())
-        })
-        .await
-        .map_err(IoError::SendError)
+    unsafe {
+        let ifindex = libc::if_nametoindex(c_ifname.as_ptr());
+        let mut sa = libc::sockaddr_ll {
+            sll_family: libc::AF_PACKET as u16,
+            sll_protocol: (ETH_P_IP as u16).to_be(),
+            sll_ifindex: ifindex as i32,
+            sll_hatype: 0,
+            sll_pkttype: 0,
+            sll_halen: 0,
+            sll_addr: [0; 8],
+        };
+
+        let ptr_sockaddr = std::mem::transmute::<
+            *mut libc::sockaddr_ll,
+            *mut libc::sockaddr,
+        >(&mut sa);
+
+        match libc::sendto(
+            sock.as_raw_fd(),
+            buf.as_ptr().cast(),
+            std::cmp::min(buf.len(), 130),
+            0,
+            ptr_sockaddr,
+            std::mem::size_of_val(&sa) as u32,
+        ) {
+            -1 => Err(IoError::SendError(std::io::Error::last_os_error())),
+            fd => Ok(fd as usize),
+        }
+    }
 }
 
 #[cfg(not(feature = "testing"))]
@@ -134,7 +174,11 @@ pub async fn send_packet_arp(
     }
 }
 
-fn join_multicast(sock: &Socket, ifname: &str) -> Result<(), std::io::Error> {
+// for joining the VRRP multicast
+pub fn join_multicast(
+    sock: &Socket,
+    ifname: &str,
+) -> Result<(), std::io::Error> {
     let sock = socket2::SockRef::from(sock);
     let ifname = CString::new(ifname).unwrap();
     let ifindex = unsafe { if_nametoindex(ifname.as_ptr()) };
@@ -153,8 +197,9 @@ pub(crate) async fn write_loop(
 ) {
     while let Some(msg) = net_tx_packetc.recv().await {
         match msg {
-            NetTxPacketMsg::Vrrp { packet } => {
-                if let Err(error) = send_packet_vrrp(&socket_vrrp, packet).await
+            NetTxPacketMsg::Vrrp { ifname, buf } => {
+                if let Err(error) =
+                    send_packet_vrrp(&socket_vrrp, &ifname, &buf[..]).await
                 {
                     error.log();
                 }
@@ -175,7 +220,7 @@ pub(crate) async fn write_loop(
     }
 }
 
-//#[cfg(not(feature = "testing"))]
+#[cfg(not(feature = "testing"))]
 pub(crate) async fn vrrp_read_loop(
     socket_vrrp: Arc<AsyncFd<Socket>>,
     vrrp_net_packet_rxp: Sender<VrrpNetRxPacketMsg>,

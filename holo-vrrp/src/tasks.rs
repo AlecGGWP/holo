@@ -7,6 +7,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use bytes::{BufMut, BytesMut};
 use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::task::{IntervalTask, Task, TimeoutTask};
 use holo_utils::{Sender, UnboundedReceiver};
@@ -92,7 +93,8 @@ pub mod messages {
         #[derive(Clone, Debug, Serialize)]
         pub enum NetTxPacketMsg {
             Vrrp {
-                packet: VrrpPacket,
+                ifname: String,
+                buf: Vec<u8>,
             },
             Arp {
                 name: String,
@@ -199,17 +201,36 @@ pub(crate) fn set_timer(
             // in case we are Master, we will be sending VRRP advertisements
             // every ADVERT_INTERVAL seconds until otherwise.
             crate::instance::State::Master => {
-                let packet = instance.vrrp_packet();
+                // -----------------
+                let mut buf = BytesMut::new();
+
+                // ethernet frame
+                let eth_frame: &[u8] = &instance.advert_ether_frame().encode();
+                buf.put(eth_frame);
+
+                // ip packet
+                let src_ip = interface.system.addresses.first().unwrap().ip();
+                let ip_pkt: &[u8] = &instance.adver_ipv4_pkt(src_ip).encode();
+                buf.put(ip_pkt);
+
+                // vrrp packet
+                let vrrp_pkt: &[u8] = &instance.adver_vrrp_pkt().encode();
+                buf.put(vrrp_pkt);
+
+                let ifname = instance.mac_vlan.name.clone();
+                // -----------------
+
                 let timer = IntervalTask::new(
                     Duration::from_secs(
                         instance.config.advertise_interval as u64,
                     ),
                     true,
                     move || {
+                        let ifname = ifname.clone();
+                        let buf = buf.to_vec();
                         let net_tx = net_tx.clone();
-                        let packet = packet.clone();
                         async move {
-                            let msg = NetTxPacketMsg::Vrrp { packet };
+                            let msg = NetTxPacketMsg::Vrrp { ifname, buf };
                             let _ = net_tx.send(msg);
                         }
                     },

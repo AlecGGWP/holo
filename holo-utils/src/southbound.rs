@@ -74,6 +74,7 @@ pub struct InterfaceUpdateMsg {
 
     #[serde(skip)]
     pub mac_address: [u8; 6],
+    pub addresses: Vec<IpNetwork>,
 }
 
 #[derive(Clone, Debug)]

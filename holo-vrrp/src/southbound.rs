@@ -4,12 +4,14 @@
 // SPDX-License-Identifier: MIT
 //
 
+use std::collections::BTreeSet;
+
 use holo_utils::ibus::{IbusMsg, IbusSender};
 use holo_utils::southbound::{
     AddressMsg, InterfaceIpAddRequestMsg, InterfaceIpDeleteRequestMsg,
     InterfaceUpdateMsg, MacvlanCreateMsg,
 };
-use ipnetwork::IpNetwork;
+use ipnetwork::{IpNetwork, Ipv4Network};
 
 use crate::interface::Interface;
 
@@ -24,6 +26,14 @@ pub(crate) fn process_iface_update(
         iface.system.flags = msg.flags;
         iface.system.ifindex = Some(msg.ifindex);
         iface.system.mac_address = msg.mac_address;
+
+        let mut ips: BTreeSet<Ipv4Network> = BTreeSet::default();
+        msg.addresses.iter().for_each(|addr| {
+            if let IpNetwork::V4(v4addr) = addr {
+                ips.insert(*v4addr);
+            }
+        });
+        iface.system.addresses = ips;
 
         // update names for all macvlans
         for (vrid, instance) in iface.instances.iter_mut() {
@@ -42,6 +52,16 @@ pub(crate) fn process_iface_update(
             mvlan_iface.system.flags = msg.flags;
             mvlan_iface.system.ifindex = Some(msg.ifindex);
             mvlan_iface.system.mac_address = msg.mac_address;
+
+            let mut ips: BTreeSet<Ipv4Network> = BTreeSet::default();
+            msg.addresses.iter().for_each(|addr| {
+                if let IpNetwork::V4(v4addr) = addr {
+                    ips.insert(*v4addr);
+                }
+            });
+
+            mvlan_iface.system.addresses = ips;
+
             mvlan_iface.create_net(&iface.tx);
             return;
         }
@@ -99,15 +119,18 @@ pub(crate) fn create_macvlan_iface(
     let _ = ibus_tx.send(IbusMsg::CreateMacVlan(msg));
 }
 
+// deletes and interface e.g eth0 entirely
 pub(crate) fn delete_iface(ifindex: u32, ibus_tx: &IbusSender) {
     let _ = ibus_tx.send(IbusMsg::InterfaceDeleteRequest(ifindex));
 }
 
+// adds an address to an interface
 pub(crate) fn addr_add(ifindex: u32, addr: IpNetwork, ibus_tx: &IbusSender) {
     let msg = InterfaceIpAddRequestMsg { ifindex, addr };
     let _ = ibus_tx.send(IbusMsg::InterfaceIpAddRequest(msg));
 }
 
+// removes a specific address from an interface
 pub(crate) fn addr_del(ifindex: u32, addr: IpNetwork, ibus_tx: &IbusSender) {
     let msg = InterfaceIpDeleteRequestMsg { ifindex, addr };
     let _ = ibus_tx.send(IbusMsg::InterfaceIpDeleteRequest(msg));

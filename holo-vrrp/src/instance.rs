@@ -12,7 +12,7 @@ use holo_utils::task::{IntervalTask, TimeoutTask};
 
 use crate::interface::MacVlanInterface;
 use crate::northbound::configuration::InstanceCfg;
-use crate::packet::{ArpPacket, EthernetFrame, VrrpPacket};
+use crate::packet::{ArpPacket, EthernetFrame, Ipv4Packet, VrrpPacket};
 use crate::tasks::messages::output::NetTxPacketMsg;
 
 #[derive(Debug)]
@@ -146,7 +146,7 @@ impl Instance {
         self.state.master_down_interval = master_down;
     }
 
-    pub(crate) fn vrrp_packet(&self) -> VrrpPacket {
+    pub(crate) fn adver_vrrp_pkt(&self) -> VrrpPacket {
         let mut ip_addresses: Vec<Ipv4Addr> = vec![];
         for addr in self.config.virtual_addresses.clone() {
             ip_addresses.push(addr.ip());
@@ -167,6 +167,36 @@ impl Instance {
         };
         packet.generate_checksum();
         packet
+    }
+
+    pub(crate) fn adver_ipv4_pkt(&self, src_address: Ipv4Addr) -> Ipv4Packet {
+        // 36 bytes (20 IP + 16 vrrp)
+        // we add 36 to:
+        // 4 * (no of virtual IPs) -> since the number of
+        //      virtual IPs makes the length of the header variable
+        let total_length =
+            (36 + (4 * self.config.virtual_addresses.len())) as u16;
+
+        Ipv4Packet {
+            version: 4,
+            ihl: 5,
+            tos: 0xc0,
+            total_length,
+            identification: 0x0007,
+            flags: 0x00,
+            offset: 0x00,
+            ttl: 255,
+            protocol: 112,
+            checksum: 0x00,
+            src_address,
+            dst_address: Ipv4Addr::new(224, 0, 0, 18),
+            options: None,
+            padding: None,
+        }
+    }
+
+    pub(crate) fn advert_ether_frame(&self) -> EthernetFrame {
+        EthernetFrame::vrrp(self.vrid)
     }
 
     pub(crate) fn send_gratuitous_arp(&self) {

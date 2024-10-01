@@ -263,7 +263,7 @@ impl VrrpPacket {
         })
     }
 
-    pub(crate) fn generate_checksum(&mut self) {
+    pub fn generate_checksum(&mut self) {
         self.checksum = checksum::calculate(self.encode().chunk(), 3);
     }
 }
@@ -272,13 +272,12 @@ impl Ipv4Packet {
     const MIN_HDR_LENGTH: usize = 20;
     const MAX_HDR_LENGTH: usize = 24;
 
-    #[allow(unused)]
-    fn encode(&self) -> BytesMut {
+    //#[allow(unused)]
+    pub fn encode(&self) -> BytesMut {
         let mut buf = BytesMut::new();
 
         // ver_ihl -> version[4 bits] + ihl[4 bits]
-        let ver_ihl: u8 = (self.version << 4) | self.ihl;
-        buf.put_u8(ver_ihl);
+        buf.put_u8(self.version << 4 | self.ihl);
         buf.put_u8(self.tos);
         buf.put_u16(self.total_length);
         buf.put_u16(self.identification);
@@ -376,7 +375,7 @@ impl Ipv4Packet {
 
 impl EthernetFrame {
     pub fn encode(&self) -> BytesMut {
-        let mut buf = BytesMut::with_capacity(14);
+        let mut buf = BytesMut::new();
         self.dst_mac.iter().for_each(|i| buf.put_u8(*i));
         self.src_mac.iter().for_each(|i| buf.put_u8(*i));
         buf.put_u16(self.ethertype);
@@ -400,6 +399,14 @@ impl EthernetFrame {
             src_mac,
             ethertype: buf.get_u16(),
         })
+    }
+
+    pub fn vrrp(vrid: u8) -> Self {
+        Self {
+            dst_mac: [0x01, 0x00, 0x5e, 0x00, 0x00, 0x12],
+            src_mac: [0x00, 0x00, 0x5e, 0x00, 0x01, vrid],
+            ethertype: 0x0800, // IP ethertype
+        }
     }
 }
 
