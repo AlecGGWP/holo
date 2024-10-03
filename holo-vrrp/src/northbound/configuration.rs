@@ -34,10 +34,16 @@ pub enum Resource {}
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Event {
+    // instance events
     InstanceCreate { vrid: u8 },
     InstanceDelete { vrid: u8 },
+
+    // virtual address events
     VirtualAddressCreate { vrid: u8, addr: Ipv4Network },
     VirtualAddressDelete { vrid: u8, addr: Ipv4Network },
+
+    // priority events
+    PriorityUpdate { vrid: u8, priority: u8 },
 }
 
 pub static VALIDATION_CALLBACKS: Lazy<ValidationCallbacks> =
@@ -95,12 +101,12 @@ fn load_callbacks() -> Callbacks<Interface> {
             instance.config.preempt = preempt;
         })
         .path(interfaces::interface::ipv4::vrrp::vrrp_instance::priority::PATH)
-        .modify_apply(|interface, args| {
+        .modify_apply(|_interface, args| {
             let vrid = args.list_entry.into_vrid().unwrap();
-            let instance = interface.instances.get_mut(&vrid).unwrap();
-
+            let event_queue = args.event_queue;
             let priority = args.dnode.get_u8();
-            instance.config.priority = priority;
+
+            event_queue.insert(Event::PriorityUpdate { vrid, priority  });
         })
         .path(interfaces::interface::ipv4::vrrp::vrrp_instance::advertise_interval_sec::PATH)
         .modify_apply(|interface, args| {
@@ -167,6 +173,7 @@ impl Provider for Interface {
 
     async fn process_event(&mut self, event: Event) {
         match event {
+            // instance events
             Event::InstanceCreate { vrid } => {
                 self.create_instance(vrid);
 
@@ -177,11 +184,21 @@ impl Provider for Interface {
             Event::InstanceDelete { vrid } => {
                 self.delete_instance(vrid);
             }
+
+            // virtual address events
             Event::VirtualAddressCreate { vrid, addr } => {
                 self.add_instance_virtual_address(vrid, addr);
             }
             Event::VirtualAddressDelete { vrid, addr } => {
                 self.delete_instance_virtual_address(vrid, addr);
+            }
+
+            // priority events
+            Event::PriorityUpdate { vrid, priority } => {
+                if let Some(instance) = self.instances.get_mut(&vrid) {
+                    instance.config.priority = priority;
+                    self.reset_timer(vrid);
+                }
             }
         }
     }

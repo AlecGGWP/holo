@@ -21,6 +21,7 @@ use holo_utils::task::Task;
 use holo_utils::{Receiver, Sender, UnboundedSender};
 use ipnetwork::{IpNetwork, Ipv4Network};
 use tokio::sync::mpsc;
+use tracing::{debug, debug_span};
 
 use crate::error::{Error, IoError};
 use crate::instance::{Instance, State};
@@ -142,17 +143,18 @@ impl Interface {
 
     pub(crate) fn change_state(&mut self, vrid: u8, state: State) {
         if let Some(instance) = self.instances.get_mut(&vrid) {
-            if state == State::Backup {
-                // change admin state of MacVlan to down.
-            } else if state == State::Master {
-                // change admin state of MacVlan to up.
-            }
+            debug_span!("change-state").in_scope(|| {
+                if state == State::Backup {
+                    debug!(%vrid, "state to BACKUP.");
+                    // change admin state of MacVlan to down.
+                } else if state == State::Master {
+                    debug!(%vrid, "state to MASTER.");
+                    // change admin state of MacVlan to up.
+                }
+            });
+
             instance.state.state = state;
-            tasks::set_timer(
-                self,
-                vrid,
-                self.tx.protocol_input.master_down_timer_tx.clone(),
-            );
+            self.reset_timer(vrid);
         }
     }
 
@@ -171,15 +173,19 @@ impl Interface {
                     &self.tx.ibus,
                 );
             }
-            // in order to update the virtual addresses being sent in subsequent
-            // requests, we will update the timer to have the updated timers with the relevant
-            // information.
-            tasks::set_timer(
-                self,
-                vrid,
-                self.tx.protocol_input.master_down_timer_tx.clone(),
-            );
+            self.reset_timer(vrid);
         }
+    }
+
+    // in order to update the details being sent in subsequent
+    // requests, we will update the timer to have the updated timers with the relevant
+    // information.
+    pub(crate) fn reset_timer(&mut self, vrid: u8) {
+        tasks::set_timer(
+            self,
+            vrid,
+            self.tx.protocol_input.master_down_timer_tx.clone(),
+        );
     }
 
     pub(crate) fn delete_instance_virtual_address(
