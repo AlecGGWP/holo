@@ -21,7 +21,7 @@ use holo_utils::task::Task;
 use holo_utils::{Receiver, Sender, UnboundedSender};
 use ipnetwork::{IpNetwork, Ipv4Network};
 use tokio::sync::mpsc;
-use tracing::{debug, debug_span};
+use tracing::{debug, debug_span, error_span};
 
 use crate::error::{Error, IoError};
 use crate::instance::{Instance, State};
@@ -36,8 +36,6 @@ pub struct Interface {
     pub name: String,
     // Interface system data.
     pub system: InterfaceSys,
-    // Interface raw sockets and Tx/Rx tasks.
-    pub net: InterfaceNet,
     // Interface VRRP instances.
     pub instances: BTreeMap<u8, Instance>,
     // Tx channels.
@@ -62,7 +60,7 @@ pub struct MacVlanInterface {
     // Interface system data.
     pub system: InterfaceSys,
     // Interface raw sockets and Tx/Rx tasks.
-    pub net: Option<InterfaceNet>,
+    pub net: Option<MvlanInterfaceNet>,
 }
 
 #[derive(Debug, Default)]
@@ -78,7 +76,7 @@ pub struct InterfaceSys {
 }
 
 #[derive(Debug)]
-pub struct InterfaceNet {
+pub struct MvlanInterfaceNet {
     // Raw sockets.
     pub socket_vrrp: Arc<AsyncFd<Socket>>,
     pub socket_arp: Arc<AsyncFd<Socket>>,
@@ -146,10 +144,26 @@ impl Interface {
             debug_span!("change-state").in_scope(|| {
                 if state == State::Backup {
                     debug!(%vrid, "state to BACKUP.");
-                    // change admin state of MacVlan to down.
+                    if let Some(ifindex) = instance.mac_vlan.system.ifindex {
+                        for addr in instance.config.virtual_addresses.clone() {
+                            southbound::addr_del(
+                                ifindex,
+                                IpNetwork::V4(addr),
+                                &self.tx.ibus,
+                            );
+                        }
+                    }
                 } else if state == State::Master {
                     debug!(%vrid, "state to MASTER.");
-                    // change admin state of MacVlan to up.
+                    if let Some(ifindex) = instance.mac_vlan.system.ifindex {
+                        for addr in instance.config.virtual_addresses.clone() {
+                            southbound::addr_add(
+                                ifindex,
+                                IpNetwork::V4(addr),
+                                &self.tx.ibus,
+                            );
+                        }
+                    }
                 }
             });
 
@@ -189,12 +203,18 @@ impl Interface {
     }
 
     pub(crate) fn delete_instance_virtual_address(
-        &self,
+        &mut self,
         vrid: u8,
         addr: Ipv4Network,
     ) {
-        if let Some(instance) = self.instances.get(&vrid) {
+        if let Some(instance) = self.instances.get_mut(&vrid) {
             if let Some(ifindex) = instance.mac_vlan.system.ifindex {
+                // remove address from the instance's configs
+                instance.config.virtual_addresses.remove(&addr);
+
+                // netlink system call will be initiated to remove the address.
+                // when response is received, this will also be modified in our
+                // system's MacVlan
                 southbound::addr_del(
                     ifindex,
                     IpNetwork::V4(addr),
@@ -205,7 +225,12 @@ impl Interface {
     }
 
     pub(crate) fn send_vrrp_advert(&self, vrid: u8) {
-        if let Some(instance) = self.instances.get(&vrid) {
+        // check for the exists instance...
+        if let Some(instance) = self.instances.get(&vrid)
+
+            // ...and confirm if the instance's parent Interface has an IP address
+            && let Some(addr) = self.system.addresses.first()
+        {
             let mut buf = BytesMut::new();
 
             // ethernet frame
@@ -213,9 +238,7 @@ impl Interface {
             buf.put(eth_frame);
 
             // ip packet
-            let ip_pkt: &[u8] = &instance
-                .adver_ipv4_pkt(self.system.addresses.first().unwrap().ip())
-                .encode();
+            let ip_pkt: &[u8] = &instance.adver_ipv4_pkt(addr.ip()).encode();
             buf.put(ip_pkt);
 
             // vrrp packet
@@ -226,7 +249,24 @@ impl Interface {
                 ifname: instance.mac_vlan.name.clone(),
                 buf: buf.to_vec(),
             };
-            let _ = self.net.net_tx_packetp.send(msg);
+            if let Some(net) = &instance.mac_vlan.net {
+                net.net_tx_packetp.send(msg);
+            }
+        } else {
+            error_span!("send-vrrp").in_scope(|| {
+                tracing::error!(%vrid, "unable to send vrrp advertisement");
+            });
+        }
+    }
+
+    // creates the MvlanInterfaceNet for the instance of said
+    // vrid. Must be done here to get some interface specifics.
+    pub(crate) fn create_mvlan_net(&mut self, vrid: u8) {
+        let net = MvlanInterfaceNet::new(self, vrid)
+            .expect("Failed to intialize VRRP tasks");
+
+        if let Some(instance) = self.instances.get_mut(&vrid) {
+            instance.mac_vlan.net = Some(net);
         }
     }
 }
@@ -246,12 +286,9 @@ impl ProtocolInstance for Interface {
         tx: InstanceChannelsTx<Interface>,
     ) -> Interface {
         // TODO: proper error handling
-        let net = InterfaceNet::new(&name, &tx)
-            .expect("Failed to initialize VRRP network tasks");
         Interface {
             name,
             system: Default::default(),
-            net,
             instances: Default::default(),
             tx,
             shared,
@@ -320,25 +357,14 @@ impl MacVlanInterface {
             net: None,
         }
     }
-
-    pub fn create_net(&mut self, tx_channels: &InstanceChannelsTx<Interface>) {
-        let net = InterfaceNet::new(&self.name, tx_channels)
-            .expect("Failed to initialize VRRP tasks");
-        self.net = Some(net);
-    }
 }
 
-// ===== impl InterfaceNet =====
+impl MvlanInterfaceNet {
+    fn new(parent_iface: &Interface, vrid: u8) -> Result<Self, IoError> {
+        let instance = parent_iface.instances.get(&vrid).unwrap();
+        let ifname = &instance.mac_vlan.name;
+        let instance_channels_tx = &parent_iface.tx;
 
-impl InterfaceNet {
-    fn new(
-        ifname: &str,
-        instance_channels_tx: &InstanceChannelsTx<Interface>,
-    ) -> Result<Self, IoError> {
-        // create socket_vrrp_rx and socket_vrrp_tx
-        // Currently being created separately so that we can customize
-        // our vrrp sockets with some virtual fields in the headers
-        // when sending out the VRRP advertisements
         let socket_vrrp_rx = network::socket_vrrp_rx(ifname)
             .map_err(IoError::SocketError)
             .and_then(|socket| {
@@ -346,8 +372,7 @@ impl InterfaceNet {
             })
             .map(Arc::new)?;
 
-        // tx will change the creation to happen in it's own function.
-        let socket_vrrp_tx = network::socket_vrrp_tx(ifname)
+        let socket_vrrp_tx = network::socket_vrrp_tx(parent_iface, vrid)
             .map_err(IoError::SocketError)
             .and_then(|socket| {
                 AsyncFd::new(socket).map_err(IoError::SocketError)
@@ -375,7 +400,7 @@ impl InterfaceNet {
             &instance_channels_tx.protocol_input.vrrp_net_packet_tx,
         );
 
-        Ok(InterfaceNet {
+        Ok(Self {
             socket_vrrp: socket_vrrp_rx,
             socket_arp,
             _net_tx_task: net_tx_task,

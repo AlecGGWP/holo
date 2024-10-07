@@ -15,22 +15,50 @@ use libc::{if_nametoindex, AF_PACKET, ETH_P_ARP, ETH_P_IP};
 use nix::sys::socket;
 use socket2::{Domain, InterfaceIndexOrAddress, Protocol, Type};
 use tokio::sync::mpsc::error::SendError;
+use tracing::{debug, debug_span};
 
 use crate::error::IoError;
+use crate::interface::Interface;
 use crate::packet::{ArpPacket, EthernetFrame, Ipv4Packet, VrrpPacket};
 use crate::tasks::messages::input::VrrpNetRxPacketMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
-pub fn socket_vrrp_tx(ifname: &str) -> Result<Socket, std::io::Error> {
+pub fn socket_vrrp_tx(
+    interface: &Interface,
+    vrid: u8,
+) -> Result<Socket, std::io::Error> {
     #[cfg(not(feature = "testing"))]
     {
-        let sock = capabilities::raise(|| {
-            Socket::new(Domain::PACKET, Type::RAW, Some(Protocol::from(112)))
-        })?;
+        let instance = interface.instances.get(&vrid).unwrap();
 
-        capabilities::raise(|| sock.bind_device(Some(ifname.as_bytes())))?;
-        capabilities::raise(|| sock.set_broadcast(true))?;
+        let sock = capabilities::raise(|| {
+            Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(112)))
+        })?;
         capabilities::raise(|| sock.set_nonblocking(true))?;
+        if let Some(addr) = instance.mac_vlan.system.addresses.first() {
+            capabilities::raise(|| {
+                match sock.set_multicast_if_v4(&addr.ip()) {
+                    Ok(_res) => {
+                        debug_span!("socket-vrrp").in_scope(|| {
+                            debug!("successfully joined multicast interface");
+                        });
+                    }
+                    Err(err) => {
+                        debug_span!("socket-vrrp").in_scope(|| {
+                            debug!(%addr, %err, "unable to join multicast interface");
+                        });
+                    }
+                }
+            });
+        }
+
+        // bind it to the primary interface's name
+        capabilities::raise(|| {
+            sock.bind_device(Some(interface.name.as_str().as_bytes()))
+        })?;
+        capabilities::raise(|| {
+            sock.set_reuse_address(true);
+        });
 
         Ok(sock)
     }
@@ -93,7 +121,7 @@ pub(crate) async fn send_packet_vrrp(
     unsafe {
         let ifindex = libc::if_nametoindex(c_ifname.as_ptr());
         let mut sa = libc::sockaddr_ll {
-            sll_family: libc::AF_PACKET as u16,
+            sll_family: libc::AF_INET as u16,
             sll_protocol: (ETH_P_IP as u16).to_be(),
             sll_ifindex: ifindex as i32,
             sll_hatype: 0,

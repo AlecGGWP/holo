@@ -10,7 +10,7 @@ use std::time::Duration;
 use bytes::{BufMut, BytesMut};
 use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::task::{IntervalTask, Task, TimeoutTask};
-use holo_utils::{Sender, UnboundedReceiver};
+use holo_utils::{Sender, UnboundedReceiver, UnboundedSender};
 use messages::input::MasterDownTimerMsg;
 use messages::output::NetTxPacketMsg;
 use tracing::{debug_span, Instrument};
@@ -183,9 +183,6 @@ pub(crate) fn set_timer(
     vrid: u8,
     master_down_tx: Sender<MasterDownTimerMsg>,
 ) {
-    // the net producer used for sending VRRP messages outside.
-    let net_tx = interface.net.net_tx_packetp.clone();
-
     if let Some(instance) = interface.instances.get_mut(&vrid) {
         match instance.state.state {
             crate::instance::State::Initialize => {
@@ -219,23 +216,25 @@ pub(crate) fn set_timer(
 
                 let ifname = instance.mac_vlan.name.clone();
                 // -----------------
-
-                let timer = IntervalTask::new(
-                    Duration::from_secs(
-                        instance.config.advertise_interval as u64,
-                    ),
-                    true,
-                    move || {
-                        let ifname = ifname.clone();
-                        let buf = buf.to_vec();
-                        let net_tx = net_tx.clone();
-                        async move {
-                            let msg = NetTxPacketMsg::Vrrp { ifname, buf };
-                            let _ = net_tx.send(msg);
-                        }
-                    },
-                );
-                instance.timer = VrrpTimer::AdverTimer(timer);
+                if let Some(net) = &instance.mac_vlan.net {
+                    let net_tx = net.net_tx_packetp.clone();
+                    let timer = IntervalTask::new(
+                        Duration::from_secs(
+                            instance.config.advertise_interval as u64,
+                        ),
+                        true,
+                        move || {
+                            let ifname = ifname.clone();
+                            let buf = buf.to_vec();
+                            let net_tx = net_tx.clone();
+                            async move {
+                                let msg = NetTxPacketMsg::Vrrp { ifname, buf };
+                                let _ = net_tx.send(msg);
+                            }
+                        },
+                    );
+                    instance.timer = VrrpTimer::AdverTimer(timer);
+                }
             }
         }
     }

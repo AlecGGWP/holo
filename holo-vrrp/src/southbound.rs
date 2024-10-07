@@ -37,14 +37,15 @@ pub(crate) fn process_iface_update(
 
         // update names for all macvlans
         for (vrid, instance) in iface.instances.iter_mut() {
-            let name = format!("mvlan-vrrp-{}", vrid);
-            instance.mac_vlan.name = name;
+            instance.mac_vlan.name = format!("mvlan-vrrp-{}", vrid);
         }
         return;
     }
 
-    // check if it is one of the macvlans being updated.
-    for (vrid, instance) in iface.instances.iter_mut() {
+    let mut target_vrid: Option<u8> = None;
+
+    //check if it is one of the macvlans being updated.
+    'outer: for (vrid, instance) in iface.instances.iter_mut() {
         let name = format!("mvlan-vrrp-{}", vrid);
         let mvlan_iface = &mut instance.mac_vlan;
 
@@ -61,35 +62,44 @@ pub(crate) fn process_iface_update(
             });
 
             mvlan_iface.system.addresses = ips;
+            target_vrid = Some(*vrid);
 
-            mvlan_iface.create_net(&iface.tx);
-            return;
+            break 'outer;
         }
+    }
+
+    if let Some(vrid) = target_vrid {
+        iface.create_mvlan_net(vrid);
     }
 }
 
 pub(crate) fn process_addr_add(iface: &mut Interface, msg: AddressMsg) {
     if msg.ifname != iface.name {
-        return;
+        if let IpNetwork::V4(addr) = msg.addr {
+            iface.system.addresses.insert(addr);
+        }
     }
 
-    if let IpNetwork::V4(addr) = msg.addr {
-        iface.system.addresses.insert(addr);
-
-        // TODO: trigger protocol event?
-    }
+    // when this is some, it means that we need to rebind our
+    // transmission socket multicast address to the newly added address
+    let mut target_vrid: Option<u8> = None;
 
     // if the interface being updated is one of the macvlans
     for (vrid, instance) in iface.instances.iter_mut() {
         let name = format!("mvlan-vrrp-{}", vrid);
         let mvlan_iface = &mut instance.mac_vlan;
-
+        if mvlan_iface.system.addresses.len() == 0 {
+            target_vrid = Some(*vrid);
+        }
         if mvlan_iface.name == name {
             if let IpNetwork::V4(addr) = msg.addr {
-                instance.config.virtual_addresses.insert(addr);
                 mvlan_iface.system.addresses.insert(addr);
             }
         }
+    }
+
+    if let Some(vrid) = target_vrid {
+        iface.create_mvlan_net(vrid);
     }
 }
 
@@ -98,10 +108,22 @@ pub(crate) fn process_addr_del(iface: &mut Interface, msg: AddressMsg) {
         return;
     }
 
+    // remove the address from the addresses of parent interfaces
     if let IpNetwork::V4(addr) = msg.addr {
         iface.system.addresses.remove(&addr);
+    }
 
-        // TODO: trigger protocol event?
+    for (vrid, instance) in iface.instances.iter_mut() {
+        let name = format!("mvlan-vrrp-{}", vrid);
+        let mvlan_iface = &mut instance.mac_vlan;
+
+        // if it is one of the macvlans being edited, we
+        // remove the macvlan's
+        if mvlan_iface.name == name {
+            if let IpNetwork::V4(addr) = msg.addr {
+                mvlan_iface.system.addresses.remove(&addr);
+            }
+        }
     }
 }
 

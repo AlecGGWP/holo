@@ -155,7 +155,7 @@ impl Instance {
         let mut packet = VrrpPacket {
             version: 2,
             hdr_type: 1,
-            vrid: u8::default(),
+            vrid: self.vrid,
             priority: self.config.priority,
             count_ip: self.config.virtual_addresses.len() as u8,
             auth_type: 0,
