@@ -32,25 +32,28 @@ pub fn socket_vrrp_tx(
         let instance = interface.instances.get(&vrid).unwrap();
 
         let sock = capabilities::raise(|| {
-            Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(112)))
+            Socket::new(Domain::PACKET, Type::RAW, Some(Protocol::from(112)))
         })?;
+
         capabilities::raise(|| sock.set_nonblocking(true))?;
-        if let Some(addr) = instance.mac_vlan.system.addresses.first() {
-            capabilities::raise(|| {
-                match sock.set_multicast_if_v4(&addr.ip()) {
-                    Ok(_res) => {
-                        debug_span!("socket-vrrp").in_scope(|| {
-                            debug!("successfully joined multicast interface");
-                        });
-                    }
-                    Err(err) => {
-                        debug_span!("socket-vrrp").in_scope(|| {
-                            debug!(%addr, %err, "unable to join multicast interface");
-                        });
-                    }
-                }
-            });
-        }
+
+        // to be uncommented in due time.
+        //if let Some(addr) = instance.mac_vlan.system.addresses.first() {
+        //    capabilities::raise(|| {
+        //        match sock.set_multicast_if_v4(&addr.ip()) {
+        //            Ok(_res) => {
+        //                debug_span!("socket-vrrp").in_scope(|| {
+        //                    debug!("successfully joined multicast interface");
+        //                });
+        //            }
+        //            Err(err) => {
+        //                debug_span!("socket-vrrp").in_scope(|| {
+        //                    debug!(%addr, %err, "unable to join multicast interface");
+        //                });
+        //            }
+        //        }
+        //    });
+        //}
 
         // Confirm if we should bind to the primary interface's address...
         // bind it to the primary interface's name

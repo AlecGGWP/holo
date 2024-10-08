@@ -250,7 +250,7 @@ impl Interface {
                 buf: buf.to_vec(),
             };
             if let Some(net) = &instance.mac_vlan.net {
-                net.net_tx_packetp.send(msg);
+                let _ = net.net_tx_packetp.send(msg);
             }
         } else {
             error_span!("send-vrrp").in_scope(|| {
