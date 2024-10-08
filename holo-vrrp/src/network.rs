@@ -52,6 +52,7 @@ pub fn socket_vrrp_tx(
             });
         }
 
+        // Confirm if we should bind to the primary interface's address...
         // bind it to the primary interface's name
         capabilities::raise(|| {
             sock.bind_device(Some(interface.name.as_str().as_bytes()))
