@@ -40,7 +40,7 @@ pub type DecodeResult<T> = Result<T, DecodeError>;
 //
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Deserialize, Serialize)]
-pub struct VrrpPacket {
+pub struct VrrpHdr {
     pub version: u8,
     pub hdr_type: u8,
     pub vrid: u8,
@@ -113,7 +113,7 @@ pub struct ARPframe {
 }
 
 impl ARPframe {
-    pub fn new(eth_pkt: EthernetFrame, arp_pkt: ArpPacket) -> Self {
+    pub fn new(eth_pkt: EthernetHdr, arp_pkt: ArpPacket) -> Self {
         Self {
             dst_mac: eth_pkt.dst_mac,
             src_mac: eth_pkt.src_mac,
@@ -135,7 +135,7 @@ impl ARPframe {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Deserialize, Serialize)]
-pub struct EthernetFrame {
+pub struct EthernetHdr {
     pub dst_mac: [u8; 6],
     pub src_mac: [u8; 6],
     pub ethertype: u16,
@@ -153,6 +153,14 @@ pub struct ArpPacket {
     pub sender_proto_address: [u8; 4], // src ip
     pub target_hw_address: [u8; 6],    // src mac
     pub target_proto_address: [u8; 4], // src ip
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct VrrpPacket {
+    pub eth: EthernetHdr,
+    pub ip: Ipv4Packet,
+    pub vrrp: VrrpHdr,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -185,7 +193,7 @@ impl DecodeError {
 
 // ===== impl Packet =====
 
-impl VrrpPacket {
+impl VrrpHdr {
     const MIN_PKT_LENGTH: usize = 16;
     const MAX_PKT_LENGTH: usize = 80;
     const MAX_IP_COUNT: usize = 16;
@@ -373,7 +381,7 @@ impl Ipv4Packet {
     }
 }
 
-impl EthernetFrame {
+impl EthernetHdr {
     pub fn encode(&self) -> BytesMut {
         let mut buf = BytesMut::new();
         self.dst_mac.iter().for_each(|i| buf.put_u8(*i));
@@ -407,6 +415,16 @@ impl EthernetFrame {
             src_mac: [0x00, 0x00, 0x5e, 0x00, 0x01, vrid],
             ethertype: 0x0800, // IP ethertype
         }
+    }
+}
+
+impl VrrpPacket {
+    pub fn encode(&self) -> BytesMut {
+        let mut buf = BytesMut::with_capacity(130);
+        buf.put(self.eth.encode());
+        buf.put(self.ip.encode());
+        buf.put(self.vrrp.encode());
+        buf
     }
 }
 

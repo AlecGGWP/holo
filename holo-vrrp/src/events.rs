@@ -8,21 +8,21 @@ use std::time::Duration;
 use crate::error::{Error, IoError};
 use crate::instance::State;
 use crate::interface::Interface;
-use crate::packet::{DecodeResult, VrrpPacket};
+use crate::packet::{DecodeResult, VrrpHdr};
 use crate::tasks;
 
 // To collect actions to be executed later
 enum VrrpAction {
-    Initialize(Ipv4Addr, VrrpPacket),
-    Backup(Ipv4Addr, VrrpPacket),
-    Master(Ipv4Addr, VrrpPacket),
+    Initialize(Ipv4Addr, VrrpHdr),
+    Backup(Ipv4Addr, VrrpHdr),
+    Master(Ipv4Addr, VrrpHdr),
 }
 
 // ===== Vrrp Network packet receipt =====
 pub(crate) fn process_vrrp_packet(
     interface: &mut Interface,
     src_ip: Ipv4Addr,
-    packet: DecodeResult<VrrpPacket>,
+    packet: DecodeResult<VrrpHdr>,
 ) -> Result<(), Error> {
     // Handle packet decoding errors
     let pkt = match packet {
@@ -53,7 +53,7 @@ pub(crate) fn process_vrrp_packet(
 fn get_vrrp_action(
     interface: &mut Interface,
     src_ip: Ipv4Addr,
-    packet: VrrpPacket,
+    packet: VrrpHdr,
 ) -> Result<VrrpAction, Error> {
     // Handle missing instance
     let instance = match interface.instances.get_mut(&packet.vrid) {

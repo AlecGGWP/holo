@@ -25,6 +25,7 @@ use tracing::{debug, debug_span, error_span};
 
 use crate::error::{Error, IoError};
 use crate::instance::{Instance, State};
+use crate::packet::VrrpPacket;
 use crate::tasks::messages::input::{MasterDownTimerMsg, VrrpNetRxPacketMsg};
 use crate::tasks::messages::output::NetTxPacketMsg;
 use crate::tasks::messages::{ProtocolInputMsg, ProtocolOutputMsg};
@@ -233,21 +234,18 @@ impl Interface {
         {
             let mut buf = BytesMut::new();
 
-            // ethernet frame
-            let eth_frame: &[u8] = &instance.advert_ether_frame().encode();
-            buf.put(eth_frame);
-
-            // ip packet
-            let ip_pkt: &[u8] = &instance.adver_ipv4_pkt(addr.ip()).encode();
-            buf.put(ip_pkt);
-
-            // vrrp packet
-            let vrrp_pkt: &[u8] = &instance.adver_vrrp_pkt().encode();
-            buf.put(vrrp_pkt);
+            let eth_hdr = instance.advert_ether_frame();
+            let ip_hdr = instance.adver_ipv4_pkt(addr.ip());
+            let vrrp_hdr = instance.adver_vrrp_pkt();
+            let pkt = VrrpPacket {
+                eth: eth_hdr,
+                ip: ip_hdr,
+                vrrp: vrrp_hdr,
+            };
 
             let msg = NetTxPacketMsg::Vrrp {
                 ifname: instance.mac_vlan.name.clone(),
-                buf: buf.to_vec(),
+                pkt,
             };
             if let Some(net) = &instance.mac_vlan.net {
                 let _ = net.net_tx_packetp.send(msg);

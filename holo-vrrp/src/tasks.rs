@@ -18,6 +18,7 @@ use tracing::{debug_span, Instrument};
 use crate::instance::{Instance, VrrpTimer};
 use crate::interface::Interface;
 use crate::network;
+use crate::packet::VrrpPacket;
 
 //
 // VRRP tasks diagram:
@@ -30,7 +31,6 @@ use crate::network;
 //                                     +--------------+
 //           master_down_timer (Nx) -> |              |
 //                    vrrp_net (Nx) -> |   instance   | -> (Nx) net_tx
-//                    arp_net  (Nx) -> |              |
 //                                     +--------------+
 //                              ibus_tx (1x) | ^ (1x) ibus_rx
 //                                           | |
@@ -44,7 +44,7 @@ use crate::network;
 pub mod messages {
     use serde::{Deserialize, Serialize};
 
-    use crate::packet::{DecodeError, VrrpPacket};
+    use crate::packet::{DecodeError, VrrpHdr};
 
     // Type aliases.
     pub type ProtocolInputMsg = input::ProtocolMsg;
@@ -66,7 +66,7 @@ pub mod messages {
         #[derive(Debug, Deserialize, Serialize)]
         pub struct VrrpNetRxPacketMsg {
             pub src: Ipv4Addr,
-            pub packet: Result<VrrpPacket, DecodeError>,
+            pub packet: Result<VrrpHdr, DecodeError>,
         }
 
         #[derive(Debug, Deserialize, Serialize)]
@@ -83,7 +83,7 @@ pub mod messages {
     // Output messages (main task -> child task).
     pub mod output {
         use super::*;
-        use crate::packet::{ArpPacket, EthernetFrame};
+        use crate::packet::{ArpPacket, EthernetHdr, VrrpPacket};
 
         #[derive(Debug, Serialize)]
         pub enum ProtocolMsg {
@@ -94,11 +94,11 @@ pub mod messages {
         pub enum NetTxPacketMsg {
             Vrrp {
                 ifname: String,
-                buf: Vec<u8>,
+                pkt: VrrpPacket,
             },
             Arp {
                 name: String,
-                eth_frame: EthernetFrame,
+                eth_frame: EthernetHdr,
                 arp_packet: ArpPacket,
             },
         }
@@ -200,20 +200,17 @@ pub(crate) fn set_timer(
             crate::instance::State::Master => {
                 // -----------------
                 let mut buf = BytesMut::new();
-
-                // ethernet frame
-                let eth_frame: &[u8] = &instance.advert_ether_frame().encode();
-                buf.put(eth_frame);
-
-                // ip packet
                 let src_ip = interface.system.addresses.first().unwrap().ip();
-                let ip_pkt: &[u8] = &instance.adver_ipv4_pkt(src_ip).encode();
-                buf.put(ip_pkt);
 
-                // vrrp packet
-                let vrrp_pkt: &[u8] = &instance.adver_vrrp_pkt().encode();
-                buf.put(vrrp_pkt);
+                let eth_hdr = instance.advert_ether_frame();
+                let ip_hdr = instance.adver_ipv4_pkt(src_ip);
+                let vrrp_hdr = instance.adver_vrrp_pkt();
 
+                let pkt = VrrpPacket {
+                    ip: ip_hdr,
+                    eth: eth_hdr,
+                    vrrp: vrrp_hdr,
+                };
                 let ifname = instance.mac_vlan.name.clone();
                 // -----------------
                 if let Some(net) = &instance.mac_vlan.net {
@@ -225,10 +222,10 @@ pub(crate) fn set_timer(
                         true,
                         move || {
                             let ifname = ifname.clone();
-                            let buf = buf.to_vec();
                             let net_tx = net_tx.clone();
+                            let pkt = pkt.clone();
                             async move {
-                                let msg = NetTxPacketMsg::Vrrp { ifname, buf };
+                                let msg = NetTxPacketMsg::Vrrp { ifname, pkt };
                                 let _ = net_tx.send(msg);
                             }
                         },

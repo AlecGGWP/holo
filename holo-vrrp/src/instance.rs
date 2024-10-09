@@ -12,7 +12,7 @@ use holo_utils::task::{IntervalTask, TimeoutTask};
 
 use crate::interface::MacVlanInterface;
 use crate::northbound::configuration::InstanceCfg;
-use crate::packet::{ArpPacket, EthernetFrame, Ipv4Packet, VrrpPacket};
+use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr};
 use crate::tasks::messages::output::NetTxPacketMsg;
 
 #[derive(Debug)]
@@ -146,13 +146,13 @@ impl Instance {
         self.state.master_down_interval = master_down;
     }
 
-    pub(crate) fn adver_vrrp_pkt(&self) -> VrrpPacket {
+    pub(crate) fn adver_vrrp_pkt(&self) -> VrrpHdr {
         let mut ip_addresses: Vec<Ipv4Addr> = vec![];
         for addr in self.config.virtual_addresses.clone() {
             ip_addresses.push(addr.ip());
         }
 
-        let mut packet = VrrpPacket {
+        let mut packet = VrrpHdr {
             version: 2,
             hdr_type: 1,
             vrid: self.vrid,
@@ -195,8 +195,8 @@ impl Instance {
         }
     }
 
-    pub(crate) fn advert_ether_frame(&self) -> EthernetFrame {
-        EthernetFrame::vrrp(self.vrid)
+    pub(crate) fn advert_ether_frame(&self) -> EthernetHdr {
+        EthernetHdr::vrrp(self.vrid)
     }
 
     pub(crate) fn send_gratuitous_arp(&self) {
@@ -219,7 +219,7 @@ impl Instance {
                 target_proto_address: addr.ip().octets(),
             };
 
-            let eth_frame = EthernetFrame {
+            let eth_hdr = EthernetHdr {
                 ethertype: 0x806,
                 dst_mac: [0xff; 6],
                 src_mac: self.mac_vlan.system.mac_address,
@@ -227,7 +227,7 @@ impl Instance {
 
             let msg = NetTxPacketMsg::Arp {
                 name: self.mac_vlan.name.clone(),
-                eth_frame,
+                eth_frame: eth_hdr,
                 arp_packet,
             };
 

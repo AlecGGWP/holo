@@ -8,7 +8,7 @@ use std::net::IpAddr;
 
 use tracing::{debug, debug_span};
 
-use crate::packet::VrrpPacket;
+use crate::packet::VrrpHdr;
 
 // VRRP debug messages.
 #[derive(Debug)]
@@ -16,8 +16,8 @@ pub enum Debug<'a> {
     InstanceCreate,
     InstanceDelete,
     // Network
-    PacketRx(&'a IpAddr, &'a VrrpPacket),
-    PacketTx(&'a IpAddr, &'a VrrpPacket),
+    PacketRx(&'a IpAddr, &'a VrrpHdr),
+    PacketTx(&'a IpAddr, &'a VrrpHdr),
 }
 
 // ===== impl Debug =====

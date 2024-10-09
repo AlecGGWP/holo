@@ -19,7 +19,8 @@ use tracing::{debug, debug_span};
 
 use crate::error::IoError;
 use crate::interface::Interface;
-use crate::packet::{ArpPacket, EthernetFrame, Ipv4Packet, VrrpPacket};
+use crate::packet::VrrpPacket;
+use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr};
 use crate::tasks::messages::input::VrrpNetRxPacketMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
@@ -36,24 +37,6 @@ pub fn socket_vrrp_tx(
         })?;
 
         capabilities::raise(|| sock.set_nonblocking(true))?;
-
-        // to be uncommented in due time.
-        //if let Some(addr) = instance.mac_vlan.system.addresses.first() {
-        //    capabilities::raise(|| {
-        //        match sock.set_multicast_if_v4(&addr.ip()) {
-        //            Ok(_res) => {
-        //                debug_span!("socket-vrrp").in_scope(|| {
-        //                    debug!("successfully joined multicast interface");
-        //                });
-        //            }
-        //            Err(err) => {
-        //                debug_span!("socket-vrrp").in_scope(|| {
-        //                    debug!(%addr, %err, "unable to join multicast interface");
-        //                });
-        //            }
-        //        }
-        //    });
-        //}
 
         // Confirm if we should bind to the primary interface's address...
         // bind it to the primary interface's name
@@ -118,15 +101,14 @@ pub fn socket_arp(ifname: &str) -> Result<Socket, std::io::Error> {
 pub(crate) async fn send_packet_vrrp(
     sock: &AsyncFd<Socket>,
     ifname: &str,
-    buf: &[u8],
+    pkt: VrrpPacket,
 ) -> Result<usize, IoError> {
     let c_ifname = CString::new(ifname).unwrap();
-
     unsafe {
         let ifindex = libc::if_nametoindex(c_ifname.as_ptr());
         let mut sa = libc::sockaddr_ll {
-            sll_family: libc::AF_INET as u16,
-            sll_protocol: (ETH_P_IP as u16).to_be(),
+            sll_family: libc::AF_PACKET as u16,
+            sll_protocol: (112 as u16).to_be(),
             sll_ifindex: ifindex as i32,
             sll_hatype: 0,
             sll_pkttype: 0,
@@ -138,6 +120,7 @@ pub(crate) async fn send_packet_vrrp(
             *mut libc::sockaddr_ll,
             *mut libc::sockaddr,
         >(&mut sa);
+        let buf: &[u8] = &pkt.encode();
 
         match libc::sendto(
             sock.as_raw_fd(),
@@ -157,12 +140,12 @@ pub(crate) async fn send_packet_vrrp(
 pub async fn send_packet_arp(
     sock: &AsyncFd<Socket>,
     ifname: &str,
-    eth_frame: EthernetFrame,
+    eth_frame: EthernetHdr,
     arp_packet: ArpPacket,
 ) -> Result<usize, IoError> {
     use std::ffi::CString;
 
-    use libc::{c_void, sendto, sockaddr, sockaddr_ll};
+    use libc::{c_void, sendto, sockaddr, sockaddr_ll, AF_INET};
 
     use crate::packet::ARPframe;
     let mut arpframe = ARPframe::new(eth_frame, arp_packet);
@@ -179,7 +162,7 @@ pub async fn send_packet_arp(
     let ifindex = unsafe { libc::if_nametoindex(c_ifname.as_ptr()) };
 
     let mut sa = sockaddr_ll {
-        sll_family: AF_PACKET as u16,
+        sll_family: AF_INET as u16,
         sll_protocol: 0x806_u16.to_be(),
         sll_ifindex: ifindex as i32,
         sll_hatype: 0,
@@ -229,9 +212,9 @@ pub(crate) async fn write_loop(
 ) {
     while let Some(msg) = net_tx_packetc.recv().await {
         match msg {
-            NetTxPacketMsg::Vrrp { ifname, buf } => {
+            NetTxPacketMsg::Vrrp { ifname, pkt } => {
                 if let Err(error) =
-                    send_packet_vrrp(&socket_vrrp, &ifname, &buf[..]).await
+                    send_packet_vrrp(&socket_vrrp, &ifname, pkt).await
                 {
                     error.log();
                 }
@@ -277,8 +260,7 @@ pub(crate) async fn vrrp_read_loop(
                         let ip_pkt =
                             Ipv4Packet::decode(&data[0..ip_header_len])
                                 .unwrap();
-                        let vrrp_pkt =
-                            VrrpPacket::decode(&data[ip_header_len..]);
+                        let vrrp_pkt = VrrpHdr::decode(&data[ip_header_len..]);
                         Ok((ip_pkt.src_address, vrrp_pkt))
                     }
                     Err(errno) => Err(errno.into()),
