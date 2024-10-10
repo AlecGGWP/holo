@@ -158,7 +158,6 @@ pub struct ArpPacket {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Deserialize, Serialize)]
 pub struct VrrpPacket {
-    pub eth: EthernetHdr,
     pub ip: Ipv4Packet,
     pub vrrp: VrrpHdr,
 }
@@ -421,7 +420,6 @@ impl EthernetHdr {
 impl VrrpPacket {
     pub fn encode(&self) -> BytesMut {
         let mut buf = BytesMut::with_capacity(130);
-        buf.put(self.eth.encode());
         buf.put(self.ip.encode());
         buf.put(self.vrrp.encode());
         buf

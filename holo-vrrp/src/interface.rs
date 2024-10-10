@@ -5,10 +5,10 @@
 //
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::{BufMut, BytesMut};
 use holo_protocol::{
     InstanceChannelsTx, InstanceShared, MessageReceiver, ProtocolInstance,
 };
@@ -30,6 +30,9 @@ use crate::tasks::messages::input::{MasterDownTimerMsg, VrrpNetRxPacketMsg};
 use crate::tasks::messages::output::NetTxPacketMsg;
 use crate::tasks::messages::{ProtocolInputMsg, ProtocolOutputMsg};
 use crate::{events, network, southbound, tasks};
+
+pub const VRRP_PROTO_NUMBER: i32 = 112;
+pub const VRRP_MULTICAST_ADDRESS: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 18);
 
 #[derive(Debug)]
 pub struct Interface {
@@ -136,7 +139,7 @@ impl Interface {
 
         self.instances.remove(&vrid);
         if let Some(ifindex) = mvlan_ifindex {
-            southbound::delete_iface(ifindex, &self.tx.ibus);
+            southbound::mvlan_delete(ifindex, &self.tx.ibus);
         }
     }
 
@@ -232,13 +235,9 @@ impl Interface {
             // ...and confirm if the instance's parent Interface has an IP address
             && let Some(addr) = self.system.addresses.first()
         {
-            let mut buf = BytesMut::new();
-
-            let eth_hdr = instance.advert_ether_frame();
             let ip_hdr = instance.adver_ipv4_pkt(addr.ip());
             let vrrp_hdr = instance.adver_vrrp_pkt();
             let pkt = VrrpPacket {
-                eth: eth_hdr,
                 ip: ip_hdr,
                 vrrp: vrrp_hdr,
             };
@@ -259,7 +258,7 @@ impl Interface {
 
     // creates the MvlanInterfaceNet for the instance of said
     // vrid. Must be done here to get some interface specifics.
-    pub(crate) fn create_mvlan_net(&mut self, vrid: u8) {
+    pub(crate) fn macvlan_create(&mut self, vrid: u8) {
         let net = MvlanInterfaceNet::new(self, vrid)
             .expect("Failed to intialize VRRP tasks");
 
@@ -363,7 +362,7 @@ impl MvlanInterfaceNet {
         let ifname = &instance.mac_vlan.name;
         let instance_channels_tx = &parent_iface.tx;
 
-        let socket_vrrp_rx = network::socket_vrrp_rx(ifname)
+        let socket_vrrp_rx = network::socket_vrrp_rx(parent_iface)
             .map_err(IoError::SocketError)
             .and_then(|socket| {
                 AsyncFd::new(socket).map_err(IoError::SocketError)

@@ -7,10 +7,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::{BufMut, BytesMut};
 use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::task::{IntervalTask, Task, TimeoutTask};
-use holo_utils::{Sender, UnboundedReceiver, UnboundedSender};
+use holo_utils::{Sender, UnboundedReceiver};
 use messages::input::MasterDownTimerMsg;
 use messages::output::NetTxPacketMsg;
 use tracing::{debug_span, Instrument};
@@ -199,16 +198,13 @@ pub(crate) fn set_timer(
             // every ADVERT_INTERVAL seconds until otherwise.
             crate::instance::State::Master => {
                 // -----------------
-                let mut buf = BytesMut::new();
                 let src_ip = interface.system.addresses.first().unwrap().ip();
 
-                let eth_hdr = instance.advert_ether_frame();
                 let ip_hdr = instance.adver_ipv4_pkt(src_ip);
                 let vrrp_hdr = instance.adver_vrrp_pkt();
 
                 let pkt = VrrpPacket {
                     ip: ip_hdr,
-                    eth: eth_hdr,
                     vrrp: vrrp_hdr,
                 };
                 let ifname = instance.mac_vlan.name.clone();

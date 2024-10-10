@@ -5,22 +5,19 @@
 //
 
 use std::ffi::CString;
-use std::net::Ipv4Addr;
 use std::os::fd::AsRawFd;
 use std::sync::Arc;
 
 use holo_utils::socket::{AsyncFd, Socket};
 use holo_utils::{capabilities, Sender, UnboundedReceiver};
-use libc::{if_nametoindex, AF_PACKET, ETH_P_ARP, ETH_P_IP};
+use libc::ETH_P_ARP;
 use nix::sys::socket;
-use socket2::{Domain, InterfaceIndexOrAddress, Protocol, Type};
+use socket2::{Domain, Protocol, Type};
 use tokio::sync::mpsc::error::SendError;
-use tracing::{debug, debug_span};
 
 use crate::error::IoError;
-use crate::interface::Interface;
-use crate::packet::VrrpPacket;
-use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr};
+use crate::interface::{Interface, VRRP_MULTICAST_ADDRESS, VRRP_PROTO_NUMBER};
+use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr, VrrpPacket};
 use crate::tasks::messages::input::VrrpNetRxPacketMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
@@ -31,20 +28,27 @@ pub fn socket_vrrp_tx(
     #[cfg(not(feature = "testing"))]
     {
         let instance = interface.instances.get(&vrid).unwrap();
-
         let sock = capabilities::raise(|| {
-            Socket::new(Domain::PACKET, Type::RAW, Some(Protocol::from(112)))
+            Socket::new(
+                Domain::IPV4,
+                Type::RAW,
+                Some(Protocol::from(VRRP_PROTO_NUMBER)),
+            )
         })?;
-
         capabilities::raise(|| sock.set_nonblocking(true))?;
+        if let Some(addr) = instance.mac_vlan.system.addresses.first() {
+            capabilities::raise(|| sock.set_multicast_if_v4(&addr.ip()))?;
+        }
+
+        capabilities::raise(|| sock.set_header_included(true))?;
 
         // Confirm if we should bind to the primary interface's address...
         // bind it to the primary interface's name
         capabilities::raise(|| {
-            sock.bind_device(Some(interface.name.as_str().as_bytes()))
+            sock.bind_device(Some(instance.mac_vlan.name.as_bytes()))
         })?;
         capabilities::raise(|| {
-            sock.set_reuse_address(true);
+            let _ = sock.set_reuse_address(true);
         });
 
         Ok(sock)
@@ -55,17 +59,19 @@ pub fn socket_vrrp_tx(
     }
 }
 
-pub fn socket_vrrp_rx(ifname: &str) -> Result<Socket, std::io::Error> {
+pub fn socket_vrrp_rx(iface: &Interface) -> Result<Socket, std::io::Error> {
     #[cfg(not(feature = "testing"))]
     {
         let sock = capabilities::raise(|| {
-            Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(112)))
+            Socket::new(
+                Domain::IPV4,
+                Type::RAW,
+                Some(Protocol::from(VRRP_PROTO_NUMBER)),
+            )
         })?;
-
-        capabilities::raise(|| sock.bind_device(Some(ifname.as_bytes())))?;
-        capabilities::raise(|| sock.set_broadcast(true))?;
+        capabilities::raise(|| sock.bind_device(Some(iface.name.as_bytes())))?;
         capabilities::raise(|| sock.set_nonblocking(true))?;
-        capabilities::raise(|| join_multicast(&sock, ifname))?;
+        capabilities::raise(|| join_multicast(&sock, iface))?;
 
         Ok(sock)
     }
@@ -107,8 +113,8 @@ pub(crate) async fn send_packet_vrrp(
     unsafe {
         let ifindex = libc::if_nametoindex(c_ifname.as_ptr());
         let mut sa = libc::sockaddr_ll {
-            sll_family: libc::AF_PACKET as u16,
-            sll_protocol: (112 as u16).to_be(),
+            sll_family: libc::AF_INET as u16,
+            sll_protocol: (VRRP_PROTO_NUMBER as u16).to_be(),
             sll_ifindex: ifindex as i32,
             sll_hatype: 0,
             sll_pkttype: 0,
@@ -192,16 +198,14 @@ pub async fn send_packet_arp(
 // for joining the VRRP multicast
 pub fn join_multicast(
     sock: &Socket,
-    ifname: &str,
+    iface: &Interface,
 ) -> Result<(), std::io::Error> {
     let sock = socket2::SockRef::from(sock);
-    let ifname = CString::new(ifname).unwrap();
-    let ifindex = unsafe { if_nametoindex(ifname.as_ptr()) };
-
-    sock.join_multicast_v4_n(
-        &Ipv4Addr::new(224, 0, 0, 18),
-        &InterfaceIndexOrAddress::Index(ifindex),
-    )
+    if let Some(addr) = iface.system.addresses.first() {
+        let ip = addr.ip();
+        return sock.join_multicast_v4(&VRRP_MULTICAST_ADDRESS, &ip);
+    }
+    Err(std::io::Error::last_os_error())
 }
 
 #[cfg(not(feature = "testing"))]
@@ -240,7 +244,7 @@ pub(crate) async fn vrrp_read_loop(
     socket_vrrp: Arc<AsyncFd<Socket>>,
     vrrp_net_packet_rxp: Sender<VrrpNetRxPacketMsg>,
 ) -> Result<(), SendError<VrrpNetRxPacketMsg>> {
-    let mut buf = [0; 128];
+    let mut buf = [0u8; 96];
     loop {
         match socket_vrrp
             .async_io(tokio::io::Interest::READABLE, |sock| {

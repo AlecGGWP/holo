@@ -10,7 +10,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use holo_utils::task::{IntervalTask, TimeoutTask};
 
-use crate::interface::MacVlanInterface;
+use crate::interface::{MacVlanInterface, VRRP_PROTO_NUMBER};
 use crate::northbound::configuration::InstanceCfg;
 use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr};
 use crate::tasks::messages::output::NetTxPacketMsg;
@@ -186,17 +186,13 @@ impl Instance {
             flags: 0x00,
             offset: 0x00,
             ttl: 255,
-            protocol: 112,
+            protocol: VRRP_PROTO_NUMBER as u8,
             checksum: 0x00,
             src_address,
             dst_address: Ipv4Addr::new(224, 0, 0, 18),
             options: None,
             padding: None,
         }
-    }
-
-    pub(crate) fn advert_ether_frame(&self) -> EthernetHdr {
-        EthernetHdr::vrrp(self.vrid)
     }
 
     pub(crate) fn send_gratuitous_arp(&self) {

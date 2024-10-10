@@ -69,12 +69,12 @@ pub(crate) fn process_iface_update(
     }
 
     if let Some(vrid) = target_vrid {
-        iface.create_mvlan_net(vrid);
+        iface.macvlan_create(vrid);
     }
 }
 
 pub(crate) fn process_addr_add(iface: &mut Interface, msg: AddressMsg) {
-    if msg.ifname != iface.name {
+    if msg.ifname == iface.name {
         if let IpNetwork::V4(addr) = msg.addr {
             iface.system.addresses.insert(addr);
         }
@@ -88,7 +88,7 @@ pub(crate) fn process_addr_add(iface: &mut Interface, msg: AddressMsg) {
     for (vrid, instance) in iface.instances.iter_mut() {
         let name = format!("mvlan-vrrp-{}", vrid);
         let mvlan_iface = &mut instance.mac_vlan;
-        if mvlan_iface.system.addresses.len() == 0 {
+        if mvlan_iface.system.addresses.is_empty() {
             target_vrid = Some(*vrid);
         }
         if mvlan_iface.name == name {
@@ -99,7 +99,8 @@ pub(crate) fn process_addr_add(iface: &mut Interface, msg: AddressMsg) {
     }
 
     if let Some(vrid) = target_vrid {
-        iface.create_mvlan_net(vrid);
+        iface.macvlan_create(vrid);
+        iface.reset_timer(vrid);
     }
 }
 
@@ -142,7 +143,7 @@ pub(crate) fn create_macvlan_iface(
 }
 
 // deletes and interface e.g eth0 entirely
-pub(crate) fn delete_iface(ifindex: u32, ibus_tx: &IbusSender) {
+pub(crate) fn mvlan_delete(ifindex: u32, ibus_tx: &IbusSender) {
     let _ = ibus_tx.send(IbusMsg::InterfaceDeleteRequest(ifindex));
 }
 
