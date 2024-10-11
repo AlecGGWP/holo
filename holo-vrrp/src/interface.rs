@@ -121,7 +121,7 @@ impl Interface {
         //  `mvlan-vrrp{primary-interface-ifindex}{vrid}`
         let name = format!("mvlan-vrrp-{}", vrid);
         let mac_address: [u8; 6] = [0x00, 0x00, 0x5e, 0x00, 0x01, vrid];
-        southbound::create_macvlan_iface(
+        southbound::tx::create_macvlan_iface(
             name.clone(),
             self.name.clone(),
             mac_address, // virtual mac address
@@ -139,7 +139,7 @@ impl Interface {
 
         self.instances.remove(&vrid);
         if let Some(ifindex) = mvlan_ifindex {
-            southbound::mvlan_delete(ifindex, &self.tx.ibus);
+            southbound::tx::mvlan_delete(ifindex, &self.tx.ibus);
         }
     }
 
@@ -150,7 +150,7 @@ impl Interface {
                     debug!(%vrid, "state to BACKUP.");
                     if let Some(ifindex) = instance.mac_vlan.system.ifindex {
                         for addr in instance.config.virtual_addresses.clone() {
-                            southbound::addr_del(
+                            southbound::tx::addr_del(
                                 ifindex,
                                 IpNetwork::V4(addr),
                                 &self.tx.ibus,
@@ -161,7 +161,7 @@ impl Interface {
                     debug!(%vrid, "state to MASTER.");
                     if let Some(ifindex) = instance.mac_vlan.system.ifindex {
                         for addr in instance.config.virtual_addresses.clone() {
-                            southbound::addr_add(
+                            southbound::tx::addr_add(
                                 ifindex,
                                 IpNetwork::V4(addr),
                                 &self.tx.ibus,
@@ -185,7 +185,7 @@ impl Interface {
             instance.config.virtual_addresses.insert(addr);
 
             if let Some(ifindex) = instance.mac_vlan.system.ifindex {
-                southbound::addr_add(
+                southbound::tx::addr_add(
                     ifindex,
                     IpNetwork::V4(addr),
                     &self.tx.ibus,
@@ -219,7 +219,7 @@ impl Interface {
                 // netlink system call will be initiated to remove the address.
                 // when response is received, this will also be modified in our
                 // system's MacVlan
-                southbound::addr_del(
+                southbound::tx::addr_del(
                     ifindex,
                     IpNetwork::V4(addr),
                     &self.tx.ibus,
@@ -433,15 +433,15 @@ async fn process_ibus_msg(
     match msg {
         // Interface update notification.
         IbusMsg::InterfaceUpd(msg) => {
-            southbound::process_iface_update(interface, msg);
+            southbound::rx::process_iface_update(interface, msg);
         }
         // Interface address addition notification.
         IbusMsg::InterfaceAddressAdd(msg) => {
-            southbound::process_addr_add(interface, msg);
+            southbound::rx::process_addr_add(interface, msg);
         }
         // Interface address delete notification.
         IbusMsg::InterfaceAddressDel(msg) => {
-            southbound::process_addr_del(interface, msg);
+            southbound::rx::process_addr_del(interface, msg);
         }
         // Ignore other events.
         _ => {}
