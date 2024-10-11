@@ -4,11 +4,9 @@
 // SPDX-License-Identifier: MIT
 //
 
-use holo_utils::{
-    ibus::{IbusMsg, IbusSender},
-    southbound::{
-        InterfaceIpAddRequestMsg, InterfaceIpDeleteRequestMsg, MacvlanCreateMsg,
-    },
+use holo_utils::ibus::{IbusMsg, IbusSender};
+use holo_utils::southbound::{
+    InterfaceIpAddRequestMsg, InterfaceIpDeleteRequestMsg, MacvlanCreateMsg,
 };
 use ipnetwork::IpNetwork;
 

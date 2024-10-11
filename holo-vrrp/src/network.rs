@@ -21,6 +21,8 @@ use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr, VrrpPacket};
 use crate::tasks::messages::input::VrrpNetRxPacketMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
+pub const MAX_VRRP_HDR_LENGTH: usize = 96;
+
 pub fn socket_vrrp_tx(
     interface: &Interface,
     vrid: u8,
@@ -244,7 +246,7 @@ pub(crate) async fn vrrp_read_loop(
     socket_vrrp: Arc<AsyncFd<Socket>>,
     vrrp_net_packet_rxp: Sender<VrrpNetRxPacketMsg>,
 ) -> Result<(), SendError<VrrpNetRxPacketMsg>> {
-    let mut buf = [0u8; 96];
+    let mut buf = [0u8; MAX_VRRP_HDR_LENGTH];
     loop {
         match socket_vrrp
             .async_io(tokio::io::Interest::READABLE, |sock| {

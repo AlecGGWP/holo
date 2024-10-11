@@ -108,17 +108,12 @@ pub(crate) fn notify_router_id_update(
 }
 
 pub(crate) fn notify_interface_update(ibus_tx: &IbusSender, iface: &Interface) {
-    let mut ip_addresses: Vec<IpNetwork> = vec![];
-    iface.addresses.iter().for_each(|(net, _addr)| {
-        ip_addresses.push(*net);
-    });
     let msg = IbusMsg::InterfaceUpd(InterfaceUpdateMsg {
         ifname: iface.name.clone(),
         ifindex: iface.ifindex.unwrap_or(0),
         mtu: iface.mtu.unwrap_or(0),
         flags: iface.flags,
         mac_address: iface.mac_address,
-        addresses: ip_addresses,
     });
     notify(ibus_tx, msg);
 }

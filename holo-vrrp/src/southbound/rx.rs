@@ -4,10 +4,8 @@
 // SPDX-License-Identifier: MIT
 //
 
-use std::collections::BTreeSet;
-
 use holo_utils::southbound::{AddressMsg, InterfaceUpdateMsg};
-use ipnetwork::{IpNetwork, Ipv4Network};
+use ipnetwork::IpNetwork;
 
 use crate::interface::Interface;
 
@@ -22,14 +20,6 @@ pub(crate) fn process_iface_update(
         iface.system.flags = msg.flags;
         iface.system.ifindex = Some(msg.ifindex);
         iface.system.mac_address = msg.mac_address;
-
-        let mut ips: BTreeSet<Ipv4Network> = BTreeSet::default();
-        msg.addresses.iter().for_each(|addr| {
-            if let IpNetwork::V4(v4addr) = addr {
-                ips.insert(*v4addr);
-            }
-        });
-        iface.system.addresses = ips;
 
         // update names for all macvlans
         for (vrid, instance) in iface.instances.iter_mut() {
@@ -50,14 +40,6 @@ pub(crate) fn process_iface_update(
             mvlan_iface.system.ifindex = Some(msg.ifindex);
             mvlan_iface.system.mac_address = msg.mac_address;
 
-            let mut ips: BTreeSet<Ipv4Network> = BTreeSet::default();
-            msg.addresses.iter().for_each(|addr| {
-                if let IpNetwork::V4(v4addr) = addr {
-                    ips.insert(*v4addr);
-                }
-            });
-
-            mvlan_iface.system.addresses = ips;
             target_vrid = Some(*vrid);
 
             break 'outer;
