@@ -17,7 +17,7 @@ use tokio::sync::mpsc::error::SendError;
 
 use crate::error::IoError;
 use crate::interface::{Interface, VRRP_MULTICAST_ADDRESS, VRRP_PROTO_NUMBER};
-use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr, VrrpPacket};
+use crate::packet::{ArpPacket, EthernetHdr, Ipv4Hdr, VrrpHdr, VrrpPacket};
 use crate::tasks::messages::input::VrrpNetRxPacketMsg;
 use crate::tasks::messages::output::NetTxPacketMsg;
 
@@ -264,8 +264,7 @@ pub(crate) async fn vrrp_read_loop(
                         let ip_header_len = ((data[0] & 0x0f) * 4) as usize;
 
                         let ip_pkt =
-                            Ipv4Packet::decode(&data[0..ip_header_len])
-                                .unwrap();
+                            Ipv4Hdr::decode(&data[0..ip_header_len]).unwrap();
                         let vrrp_pkt = VrrpHdr::decode(&data[ip_header_len..]);
                         Ok((ip_pkt.src_address, vrrp_pkt))
                     }

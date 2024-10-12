@@ -76,7 +76,7 @@ pub struct VrrpHdr {
 //
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Deserialize, Serialize)]
-pub struct Ipv4Packet {
+pub struct Ipv4Hdr {
     pub version: u8,
     pub ihl: u8,
     pub tos: u8,
@@ -158,7 +158,7 @@ pub struct ArpPacket {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Deserialize, Serialize)]
 pub struct VrrpPacket {
-    pub ip: Ipv4Packet,
+    pub ip: Ipv4Hdr,
     pub vrrp: VrrpHdr,
 }
 
@@ -275,7 +275,7 @@ impl VrrpHdr {
     }
 }
 
-impl Ipv4Packet {
+impl Ipv4Hdr {
     const MIN_HDR_LENGTH: usize = 20;
     const MAX_HDR_LENGTH: usize = 24;
 
@@ -390,21 +390,16 @@ impl EthernetHdr {
     }
 
     pub fn decode(data: &[u8]) -> DecodeResult<Self> {
-        let mut buf = Bytes::copy_from_slice(data);
-        let dst_mac: [u8; 6] = [0u8; 6];
-        let src_mac: [u8; 6] = [0u8; 6];
+        let dst_mac = &data[0..6].try_into();
+        let dst_mac: [u8; 6] = dst_mac.unwrap();
 
-        for mut _x in &dst_mac {
-            _x = &buf.get_u8();
-        }
-        for mut _x in &src_mac {
-            _x = &buf.get_u8();
-        }
+        let src_mac = &data[6..12].try_into();
+        let src_mac: [u8; 6] = src_mac.unwrap();
 
         Ok(Self {
             dst_mac,
             src_mac,
-            ethertype: buf.get_u16(),
+            ethertype: 0x0800,
         })
     }
 

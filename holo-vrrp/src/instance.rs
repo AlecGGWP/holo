@@ -12,7 +12,7 @@ use holo_utils::task::{IntervalTask, TimeoutTask};
 
 use crate::interface::{MacVlanInterface, VRRP_PROTO_NUMBER};
 use crate::northbound::configuration::InstanceCfg;
-use crate::packet::{ArpPacket, EthernetHdr, Ipv4Packet, VrrpHdr};
+use crate::packet::{ArpPacket, EthernetHdr, Ipv4Hdr, VrrpHdr};
 use crate::tasks::messages::output::NetTxPacketMsg;
 
 #[derive(Debug)]
@@ -169,7 +169,7 @@ impl Instance {
         packet
     }
 
-    pub(crate) fn adver_ipv4_pkt(&self, src_address: Ipv4Addr) -> Ipv4Packet {
+    pub(crate) fn adver_ipv4_pkt(&self, src_address: Ipv4Addr) -> Ipv4Hdr {
         // 36 bytes (20 IP + 16 vrrp)
         // we add 36 to:
         // 4 * (no of virtual IPs) -> since the number of
@@ -177,7 +177,7 @@ impl Instance {
         let total_length =
             (36 + (4 * self.config.virtual_addresses.len())) as u16;
 
-        Ipv4Packet {
+        Ipv4Hdr {
             version: 4,
             ihl: 5,
             tos: 0xc0,
