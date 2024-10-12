@@ -7,12 +7,11 @@
 // See: https://nlnet.nl/NGI0
 //
 
-use std::{net::Ipv4Addr, sync::LazyLock};
+use std::net::Ipv4Addr;
+use std::sync::LazyLock;
 
-use holo_vrrp::{
-    interface::{VRRP_MULTICAST_ADDRESS, VRRP_PROTO_NUMBER},
-    packet::{EthernetHdr, Ipv4Hdr, VrrpHdr},
-};
+use holo_vrrp::interface::{VRRP_MULTICAST_ADDRESS, VRRP_PROTO_NUMBER};
+use holo_vrrp::packet::{EthernetHdr, Ipv4Hdr, VrrpHdr};
 
 static VRRPHDR: LazyLock<(Vec<u8>, VrrpHdr)> = LazyLock::new(|| {
     (
