@@ -83,5 +83,6 @@ async fn main() {
             eprintln!("Unsupported protocol type");
             std::process::exit(1);
         }
+        Protocol::VRRP => todo!(),
     }
 }
