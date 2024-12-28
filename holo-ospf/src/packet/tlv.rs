@@ -370,6 +370,31 @@ pub struct UnknownTlv {
     pub value: Bytes,
 }
 
+
+// SRv6 Capabilities TLV
+//
+// Encoding format:
+//
+//   0                   1                   2                   3
+//   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   |              Type             |             Length            |
+//   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   |                             Value                             |
+//
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct SRv6CapabilitiesTlv {
+    pub tlv_type: u16,
+    pub length: u16,
+    pub value: Vec<u8>,
+}
+
+// ===== impl Srv6CapabilitiesTlv =====
+
+//TODO
+
 // ===== impl BierSubTlv =====
 
 impl BierSubTlv {
