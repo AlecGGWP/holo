@@ -386,14 +386,52 @@ pub struct UnknownTlv {
 #[derive(Clone, Debug, Eq, new, PartialEq)]
 #[derive(Deserialize, Serialize)]
 pub struct SRv6CapabilitiesTlv {
-    pub tlv_type: u16,
-    pub length: u16,
-    pub value: Vec<u8>,
+    pub tlv_type: u16,  // Indique qu'il s'agit du TLV SRv6 Capabilities
+    pub length: u16, // Taille totale des données du TLV
+    pub flags: u16,
+    pub reserved: u16,
+    // pub value: Vec<u8>,
+    // TODO flag, reserved
 }
 
 // ===== impl Srv6CapabilitiesTlv =====
 
 //TODO
+impl SRv6CapabilitiesTlv {
+    /// Décodage d'un SRv6CapabilitiesTlv depuis un flux de bytes
+    // pub(crate) fn decode(tlv_len: u16, buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(tlv_len: u16, buf: &mut Bytes) -> DecodeResult<Self> {
+        // TODO Verif taille ( exemple 4 dans les autres codes de ce fichier)
+        // QUESTION : max ? 
+
+        // QUESTION ou commence le pointeur ? 
+        let tlv_type = buf.get_u16();
+        let length = buf.get_u16();
+        
+        
+
+        Ok(SRv6CapabilitiesTlv {
+            tlv_type,   
+            length, 
+            flags: 0, // Set to 0, to avoid missing field 
+            reserved: 0,   // Set to 0, to avoid missing field          
+        })
+    }
+
+    /// Encodage d'un SRv6CapabilitiesTlv en bytes
+    // pub(crate) fn encode(
+    pub fn encode(
+        &self,
+        buf: &mut BytesMut, 
+    ) {
+        let start_pos = tlv_encode_start(buf,self.tlv_type); // How use start buf ? 
+        buf.put_u16(self.flags);
+        buf.put_u16(self.reserved);
+        tlv_encode_end(buf, start_pos);
+    }
+
+    // GET TODO ? 
+}
 
 // ===== impl BierSubTlv =====
 
