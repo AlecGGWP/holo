@@ -16,8 +16,6 @@ mod tests {
     #[test]
     fn test_srv6_tlv_encode_decode() {
         let original_tlv = SRv6CapabilitiesTlv {
-            tlv_type: 20, 
-            length: 4,
             flags: 0, 
             reserved: 0,  
         };
@@ -25,7 +23,7 @@ mod tests {
         let mut buf = BytesMut::new();
         original_tlv.encode(&mut buf);
 
-        let decoded_tlv = SRv6CapabilitiesTlv::decode(original_tlv.length, &mut Bytes::from(buf)).unwrap();
+        let decoded_tlv = SRv6CapabilitiesTlv::decode(&mut Bytes::from(buf)).unwrap();
 
         dbg!(&original_tlv);
         dbg!(&decoded_tlv);

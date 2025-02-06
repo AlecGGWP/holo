@@ -378,41 +378,33 @@ pub struct UnknownTlv {
 //   0                   1                   2                   3
 //   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |              Type             |             Length            |
+//   |             flags             |            reserved           |
 //   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//   |                             Value                             |
+//   |                            sub-tlv                            |
 //
 
 #[derive(Clone, Debug, Eq, new, PartialEq)]
 #[derive(Deserialize, Serialize)]
 pub struct SRv6CapabilitiesTlv {
-    pub tlv_type: u16,  // Indique qu'il s'agit du TLV SRv6 Capabilities
-    pub length: u16, // Taille totale des données du TLV
     pub flags: u16,
     pub reserved: u16,
-    // pub value: Vec<u8>,
-    // TODO flag, reserved
+    //TODO ajouter vecteur subTLV avec le bon type
+    // pub value: Vec<TODO>,
 }
 
 // ===== impl Srv6CapabilitiesTlv =====
 
 //TODO
+// RFC link : https://datatracker.ietf.org/doc/html/rfc9513#name-srv6-capabilities-tlv
 impl SRv6CapabilitiesTlv {
     /// Décodage d'un SRv6CapabilitiesTlv depuis un flux de bytes
     // pub(crate) fn decode(tlv_len: u16, buf: &mut Bytes) -> DecodeResult<Self> {
-    pub fn decode(tlv_len: u16, buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         // TODO Verif taille ( exemple 4 dans les autres codes de ce fichier)
-        // QUESTION : max ? 
-
-        // QUESTION ou commence le pointeur ? 
-        let tlv_type = buf.get_u16();
-        let length = buf.get_u16();
-        
-        
+        // QUESTION : max ?
+        // mettre les sub_TLV
 
         Ok(SRv6CapabilitiesTlv {
-            tlv_type,   
-            length, 
             flags: 0, // Set to 0, to avoid missing field 
             reserved: 0,   // Set to 0, to avoid missing field          
         })
@@ -424,13 +416,81 @@ impl SRv6CapabilitiesTlv {
         &self,
         buf: &mut BytesMut, 
     ) {
-        let start_pos = tlv_encode_start(buf,self.tlv_type); // How use start buf ? 
+        let start_pos = tlv_encode_start(buf,self.flags); // TODO: How use start buf ? 
         buf.put_u16(self.flags);
         buf.put_u16(self.reserved);
         tlv_encode_end(buf, start_pos);
     }
 
-    // GET TODO ? 
+}
+
+// SSRv6 Locator TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/html/rfc9513#section-7.1
+//
+// Encoding format:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |              Type             |             Length            |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |  Route Type   |  Algorithm    | Locator Length| PrefixOptions |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                             Metric                            |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   Locator (up to 16 octets) ...                               |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... Locator continued ...                                   |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... Locator continued ...                                   |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... Locator concluded                                       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                      Sub-TLVs (variable)                      |
+// +-                                                             -+
+// |                             ...                               |
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct SRv6LocatorTlv {
+    pub route_type: u8,
+    pub algorithm: u8,
+    pub locator_length: u8,
+    pub prefix_option: u8,
+    pub metric: u32,
+    pub locator: Ipv6Addr,
+    //TODO sub_tlv
+    //pub sub_tlvs: Vec<TODO>,
+}
+
+impl SRv6LocatorTlv {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(SRv6LocatorTlv {
+            route_type: 0,
+            algorithm: 0,
+            locator_length: 0,
+            prefix_option: 0,
+            metric: 0,
+            locator: 0,         
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.route_type); // TODO : How use start buf ? 
+        buf.put_u16(self.route_type);
+        buf.put_u16(self.algorithm);
+        buf.put_u16(self.locator_length);
+        buf.put_u16(self.prefix_option);
+        buf.put_u16(self.metric);
+        buf.put_u16(self.locator);
+        tlv_encode_end(buf, start_pos);
+    }
 }
 
 // ===== impl BierSubTlv =====
