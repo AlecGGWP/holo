@@ -459,7 +459,7 @@ pub struct SRv6LocatorTlv {
     pub locator_length: u8,
     pub prefix_option: u8,
     pub metric: u32,
-    pub locator: Ipv6Addr,
+    pub locator: Vec<u16>,
     //TODO sub_tlv
     //pub sub_tlvs: Vec<TODO>,
 }
@@ -474,7 +474,7 @@ impl SRv6LocatorTlv {
             locator_length: 0,
             prefix_option: 0,
             metric: 0,
-            locator: 0,         
+            locator: Vec::new(),         
         })
     }
 
@@ -489,6 +489,465 @@ impl SRv6LocatorTlv {
         buf.put_u16(self.prefix_option);
         buf.put_u16(self.metric);
         buf.put_u16(self.locator);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 IPv6-Forwarding-Address sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/html/rfc8362#section-3.10
+//
+// Encoding format:
+//
+//0                   1                   2                   3
+//       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |       1 - Forwarding Address  |          sub-TLV Length       |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//      |                                                               |
+//      +-                                                             -+
+//      |                                                               |
+//      +-                    Forwarding Address                       -+
+//      |                                                               |
+//      +-                                                             -+
+//      |                                                               |
+//      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct IPv6ForwardingAddress {
+    pub forwarding_address: Vec<u16>,
+}
+
+impl IPv6ForwardingAddress {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(IPv6ForwardingAddress {
+            forwarding_address = Vec::new(),    
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.forwarding_address); // TODO : How use start buf ? 
+        buf.put_u16(self.forwarding_address);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 Route-Tag sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/html/rfc8362#section-3.12
+//
+// Encoding format:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |       3 - Route Tag           |          sub-TLV Length       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                          Route Tag                            |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct RouteTag {
+    pub route_tag:u32,
+}
+
+impl RouteTag {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(RouteTag {
+            route_tag = 0,      
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.route_tag); // TODO : How use start buf ? 
+        buf.put_u16(self.route_tag);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 Prefix Source OSPF Router-ID sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/rfc9084/ [Section2.1]
+//
+// Encoding format:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |               Type            |              Length           |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |                        OSPF Router ID                         |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct PrefixSourceOSPFRouterId {
+    pub ospf_router_id:u32,
+}
+
+impl PrefixSourceOSPFRouterId {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(PrefixSourceOSPFRouterId {
+            ospf_router_id = 0,      
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.ospf_router_id); // TODO : How use start buf ? 
+        buf.put_u16(self.ospf_router_id);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 Prefix Source Router Address sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/rfc9084/ [Section2.2]
+//
+// Encoding format:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |               Type            |              Length           |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |              Router Address (4 or 16 octets)                  |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct PrefixSourceRouterAddress {
+    pub router_address: Vec<u16>,
+}
+
+impl PrefixSourceRouterAddress {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(PrefixSourceRouterAddress {
+            router_address = Vec::new(),      
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.router_address); // TODO : How use start buf ? 
+        buf.put_u16(self.router_address);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 End SID sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/rfc9513/ [Section 8]
+//
+// Encoding format:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |               Type            |          Length               |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |     Flags     |   Reserved    |        Endpoint Behavior      |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   SID (128 bits) ...                                          |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID continued ...                                       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID continued ...                                       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID concluded                                           |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   Sub-TLVs (variable) . . .
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct EndSID {
+    pub flags: u8,
+    pub reserved: u8,
+    pub endpoint_behavior: u16,
+    pub sid: Vec<u16>,
+    //TODO faire le vecteur des sous TLV
+}
+
+impl EndSID {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(EndSID {
+            flags: 0,
+            reserved: 0,
+            endpoint_behavior: 0,
+            sid: Vec::new(),      
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.flags); // TODO : How use start buf ? 
+        buf.put_u16(self.flags);
+        buf.put_u16(self.reserved);
+        buf.put_u16(self.endpoint_behavior);
+        buf.put_u16(self.sid);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 End.X SID sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/rfc9513/ [Section 9.1]
+//
+// Encoding format:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |               Type            |          Length               |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |        Endpoint Behavior      |     Flags     |   Reserved1   |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   Algorithm   |    Weight     |           Reserved2           |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   SID (128 bits) ...                                          |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID continued ...                                       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID continued ...                                       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID concluded                                           |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |    Sub-TLVs (variable) . . .
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct EndXSID {
+    pub endpoint_behavior: u16,
+    pub flags: u8,
+    pub reserved1: u8,
+    pub algorithm: u8,
+    pub weight: u8,
+    pub reserved2: u16,
+    pub sid: Vec<u16>,
+    //TODO faire le vecteur des sous TLV
+}
+
+impl EndXSID {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(EndXSID {
+            endpoint_behavior: 0,
+            flags: 0,
+            reserved1: 0,
+            algorithm: 0,
+            weight: 0,
+            reserved2: 0,
+            sid: Vec::new(),     
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.endpoint_behavior); // TODO : How use start buf ? 
+        buf.put_u16(self.endpoint_behavior);
+        buf.put_u16(self.flags);
+        buf.put_u16(self.reserved1);
+        buf.put_u16(self.algorithm);
+        buf.put_u16(self.weight);
+        buf.put_u16(self.reserved2);
+        buf.put_u16(self.sid);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 LAN End.X SID sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/rfc9513/ [Section 9.2]
+//
+// Encoding format:
+//
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |               Type            |          Length               |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |        Endpoint Behavior      |     Flags     |   Reserved1   |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   Algorithm   |    Weight     |           Reserved2           |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   SID (128 bits) ...                                          |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID continued ...                                       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID continued ...                                       |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |   ... SID concluded                                           |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |    Sub-TLVs (variable) . . .
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct LanEndXSID {
+    pub endpoint_behavior: u16,
+    pub flags: u8,
+    pub reserved1: u8,
+    pub algorithm: u8,
+    pub weight: u8,
+    pub reserved2: u16,
+    pub sid: Vec<u16>,
+    //TODO faire le vecteur des sous TLV
+}
+
+impl LanEndXSID {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(LanEndXSID {
+            endpoint_behavior: 0,
+            flags: 0,
+            reserved1: 0,
+            algorithm: 0,
+            weight: 0,
+            reserved2: 0,
+            sid: Vec::new(),     
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.endpoint_behavior); // TODO : How use start buf ? 
+        buf.put_u16(self.endpoint_behavior);
+        buf.put_u16(self.flags);
+        buf.put_u16(self.reserved1);
+        buf.put_u16(self.algorithm);
+        buf.put_u16(self.weight);
+        buf.put_u16(self.reserved2);
+        buf.put_u16(self.sid);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 SID Structure sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/rfc9513/ [Section 10]
+//
+// Encoding format:
+//
+// 
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |               Type            |          Length               |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |    LB Length  |  LN Length    | Fun. Length   |  Arg. Length  |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct SidStructure {
+    pub lb_length: u8,
+    pub ln_length: u8,
+    pub fun_length: u8,
+    pub arg_length: u8,
+}
+
+impl SidStructure {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(SidStructure {
+            lb_length: 0,
+            ln_length: 0,
+            fun_length: 0,
+            arg_length: 0,    
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.lb_length); // TODO : How use start buf ? 
+        buf.put_u16(self.lb_length);
+        buf.put_u16(self.ln_length);
+        buf.put_u16(self.fun_length);
+        buf.put_u16(self.arg_length);
+        tlv_encode_end(buf, start_pos);
+    }
+}
+
+// SSRv6 SID Structure sub-TLV
+// 
+// RFC link : https://datatracker.ietf.org/doc/rfc9513/ [Section 10]
+//
+// Encoding format:
+//
+// 
+// 0                   1                   2                   3
+// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |               Type            |          Length               |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// |    LB Length  |  LN Length    | Fun. Length   |  Arg. Length  |
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+#[derive(Clone, Debug, Eq, new, PartialEq)]
+#[derive(Deserialize, Serialize)]
+pub struct SidStructure {
+    pub lb_length: u8,
+    pub ln_length: u8,
+    pub fun_length: u8,
+    pub arg_length: u8,
+}
+
+impl SidStructure {
+
+    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+        //TODO : vérifier valeurs
+        Ok(SidStructure {
+            lb_length: 0,
+            ln_length: 0,
+            fun_length: 0,
+            arg_length: 0,    
+        })
+    }
+
+    pub encode(
+        &self,
+        buf: &mut BytesMut,
+    ) {
+        let start_pos = tlv_encode_start(buf,self.lb_length); // TODO : How use start buf ? 
+        buf.put_u16(self.lb_length);
+        buf.put_u16(self.ln_length);
+        buf.put_u16(self.fun_length);
+        buf.put_u16(self.arg_length);
         tlv_encode_end(buf, start_pos);
     }
 }
