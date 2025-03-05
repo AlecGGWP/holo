@@ -514,7 +514,7 @@ pub struct SRv6LocatorTlv {
 
 impl SRv6LocatorTlv {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(SRv6LocatorTlv {
             route_type: 0,
@@ -526,16 +526,16 @@ impl SRv6LocatorTlv {
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
         let start_pos = tlv_encode_start(buf,self.route_type); // TODO : How use start buf ? 
-        buf.put_u16(self.route_type);
-        buf.put_u16(self.algorithm);
-        buf.put_u16(self.locator_length);
-        buf.put_u16(self.prefix_option);
-        buf.put_u16(self.metric);
+        buf.put_u8(self.route_type);
+        buf.put_u8(self.algorithm);
+        buf.put_u8(self.locator_length);
+        buf.put_u8(self.prefix_option);
+        buf.put_u32(self.metric);
         buf.put_u16(self.locator);
         tlv_encode_end(buf, start_pos);
     }
@@ -569,14 +569,14 @@ pub struct IPv6ForwardingAddress {
 
 impl IPv6ForwardingAddress {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(IPv6ForwardingAddress {
-            forwarding_address = Vec::new(),    
+            forwarding_address: Vec::new(),    
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
@@ -608,14 +608,14 @@ pub struct RouteTag {
 
 impl RouteTag {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(RouteTag {
-            route_tag = 0,      
+            route_tag: 0,      
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
@@ -647,14 +647,14 @@ pub struct PrefixSourceOSPFRouterId {
 
 impl PrefixSourceOSPFRouterId {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(PrefixSourceOSPFRouterId {
-            ospf_router_id = 0,      
+            ospf_router_id: 0,      
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
@@ -686,14 +686,14 @@ pub struct PrefixSourceRouterAddress {
 
 impl PrefixSourceRouterAddress {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(PrefixSourceRouterAddress {
-            router_address = Vec::new(),      
+            router_address: Vec::new(),      
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
@@ -739,7 +739,7 @@ pub struct EndSID {
 
 impl EndSID {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(EndSID {
             flags: 0,
@@ -749,7 +749,7 @@ impl EndSID {
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
@@ -803,7 +803,7 @@ pub struct EndXSID {
 
 impl EndXSID {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(EndXSID {
             endpoint_behavior: 0,
@@ -816,7 +816,7 @@ impl EndXSID {
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
@@ -873,7 +873,7 @@ pub struct LanEndXSID {
 
 impl LanEndXSID {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(LanEndXSID {
             endpoint_behavior: 0,
@@ -886,7 +886,7 @@ impl LanEndXSID {
         })
     }
 
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
@@ -928,7 +928,7 @@ pub struct SidStructure {
 
 impl SidStructure {
 
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
+    pub fn decode(buf: &mut Bytes) -> DecodeResult<Self> {
         //TODO : vérifier valeurs
         Ok(SidStructure {
             lb_length: 0,
@@ -938,56 +938,7 @@ impl SidStructure {
         })
     }
 
-    pub encode(
-        &self,
-        buf: &mut BytesMut,
-    ) {
-        let start_pos = tlv_encode_start(buf,self.lb_length); // TODO : How use start buf ? 
-        buf.put_u16(self.lb_length);
-        buf.put_u16(self.ln_length);
-        buf.put_u16(self.fun_length);
-        buf.put_u16(self.arg_length);
-        tlv_encode_end(buf, start_pos);
-    }
-}
-
-// SSRv6 SID Structure sub-TLV
-// 
-// RFC link : https://datatracker.ietf.org/doc/rfc9513/ [Section 10]
-//
-// Encoding format:
-//
-// 
-// 0                   1                   2                   3
-// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |               Type            |          Length               |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |    LB Length  |  LN Length    | Fun. Length   |  Arg. Length  |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-#[derive(Clone, Debug, Eq, new, PartialEq)]
-#[derive(Deserialize, Serialize)]
-pub struct SidStructure {
-    pub lb_length: u8,
-    pub ln_length: u8,
-    pub fun_length: u8,
-    pub arg_length: u8,
-}
-
-impl SidStructure {
-
-    pub decode(buf: &mut Bytes) -> DecodeResult<Self> {
-        //TODO : vérifier valeurs
-        Ok(SidStructure {
-            lb_length: 0,
-            ln_length: 0,
-            fun_length: 0,
-            arg_length: 0,    
-        })
-    }
-
-    pub encode(
+    pub fn encode(
         &self,
         buf: &mut BytesMut,
     ) {
