@@ -536,7 +536,7 @@ impl SRv6LocatorTlv {
         buf.put_u8(self.locator_length);
         buf.put_u8(self.prefix_option);
         buf.put_u32(self.metric);
-        buf.put_u16(self.locator);
+        //buf.put_bytes(0, self.locator_length, self.locator); //TODO regarder pour update ceci 
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -620,7 +620,7 @@ impl RouteTag {
         buf: &mut BytesMut,
     ) {
         let start_pos = tlv_encode_start(buf,self.route_tag); // TODO : How use start buf ? 
-        buf.put_u16(self.route_tag);
+        buf.put_u32(self.route_tag);
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -659,7 +659,7 @@ impl PrefixSourceOSPFRouterId {
         buf: &mut BytesMut,
     ) {
         let start_pos = tlv_encode_start(buf,self.ospf_router_id); // TODO : How use start buf ? 
-        buf.put_u16(self.ospf_router_id);
+        buf.put_u32(self.ospf_router_id);
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -698,7 +698,7 @@ impl PrefixSourceRouterAddress {
         buf: &mut BytesMut,
     ) {
         let start_pos = tlv_encode_start(buf,self.router_address); // TODO : How use start buf ? 
-        buf.put_u16(self.router_address);
+        //buf.put_u16(self.router_address); //TODO regarder pour mettre le vecteur
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -754,10 +754,10 @@ impl EndSID {
         buf: &mut BytesMut,
     ) {
         let start_pos = tlv_encode_start(buf,self.flags); // TODO : How use start buf ? 
-        buf.put_u16(self.flags);
-        buf.put_u16(self.reserved);
+        buf.put_u8(self.flags);
+        buf.put_u8(self.reserved);
         buf.put_u16(self.endpoint_behavior);
-        buf.put_u16(self.sid);
+        //buf.put_u16(self.sid); //TODO regarder pour mettre le tableau dans le buffer
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -822,12 +822,12 @@ impl EndXSID {
     ) {
         let start_pos = tlv_encode_start(buf,self.endpoint_behavior); // TODO : How use start buf ? 
         buf.put_u16(self.endpoint_behavior);
-        buf.put_u16(self.flags);
-        buf.put_u16(self.reserved1);
-        buf.put_u16(self.algorithm);
-        buf.put_u16(self.weight);
+        buf.put_u8(self.flags);
+        buf.put_u8(self.reserved1);
+        buf.put_u8(self.algorithm);
+        buf.put_u8(self.weight);
         buf.put_u16(self.reserved2);
-        buf.put_u16(self.sid);
+        //buf.put_u16(self.sid); //TODO regarder pour mettre le tableau dans le buffer
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -892,12 +892,12 @@ impl LanEndXSID {
     ) {
         let start_pos = tlv_encode_start(buf,self.endpoint_behavior); // TODO : How use start buf ? 
         buf.put_u16(self.endpoint_behavior);
-        buf.put_u16(self.flags);
-        buf.put_u16(self.reserved1);
-        buf.put_u16(self.algorithm);
-        buf.put_u16(self.weight);
+        buf.put_u8(self.flags);
+        buf.put_u8(self.reserved1);
+        buf.put_u8(self.algorithm);
+        buf.put_u8(self.weight);
         buf.put_u16(self.reserved2);
-        buf.put_u16(self.sid);
+        //buf.put_u16(self.sid); //TODO regarder pour mettre le tableau dans le buffer
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -943,10 +943,10 @@ impl SidStructure {
         buf: &mut BytesMut,
     ) {
         let start_pos = tlv_encode_start(buf,self.lb_length); // TODO : How use start buf ? 
-        buf.put_u16(self.lb_length);
-        buf.put_u16(self.ln_length);
-        buf.put_u16(self.fun_length);
-        buf.put_u16(self.arg_length);
+        buf.put_u8(self.lb_length);
+        buf.put_u8(self.ln_length);
+        buf.put_u8(self.fun_length);
+        buf.put_u8(self.arg_length);
         tlv_encode_end(buf, start_pos);
     }
 }
