@@ -580,8 +580,12 @@ impl IPv6ForwardingAddress {
         &self,
         buf: &mut BytesMut,
     ) {
-        let start_pos = tlv_encode_start(buf,self.forwarding_address); // TODO : How use start buf ? 
-        buf.put_u16(self.forwarding_address);
+        //TODO regarder pour voir les encode avec Vecteur de u16
+        let start_pos = tlv_encode_start(buf, self.forwarding_address.get(0).copied().unwrap_or(0));
+        buf.put_bytes(
+            self.forwarding_address.as_ptr() as u8,
+            self.forwarding_address.len() * std::mem::size_of::<u16>()
+        );
         tlv_encode_end(buf, start_pos);
     }
 }
@@ -697,8 +701,11 @@ impl PrefixSourceRouterAddress {
         &self,
         buf: &mut BytesMut,
     ) {
-        let start_pos = tlv_encode_start(buf,self.router_address); // TODO : How use start buf ? 
-        //buf.put_u16(self.router_address); //TODO regarder pour mettre le vecteur
+        let start_pos = tlv_encode_start(buf, self.router_address.get(0).copied().unwrap_or(0));
+        buf.put_bytes(
+            self.router_address.as_ptr() as u8,
+            self.router_address.len() * std::mem::size_of::<u16>()
+        );
         tlv_encode_end(buf, start_pos);
     }
 }
