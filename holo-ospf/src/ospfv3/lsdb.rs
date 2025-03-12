@@ -37,9 +37,7 @@ use crate::packet::lsa::{
     Lsa, LsaHdrVersion, LsaKey, LsaScope, LsaTypeVersion, PrefixSidVersion,
 };
 use crate::packet::tlv::{
-    BierEncapId, BierEncapSubSubTlv, BierSubSubTlv, BierSubTlv,
-    DynamicHostnameTlv, NodeAdminTagTlv, PrefixSidFlags, RouterInfoCaps,
-    RouterInfoCapsTlv, SidLabelRangeTlv, SrAlgoTlv, SrLocalBlockTlv,
+    BierEncapId, BierEncapSubSubTlv, BierSubSubTlv, BierSubTlv, DynamicHostnameTlv, NodeAdminTagTlv, PrefixSidFlags, RouterInfoCaps, RouterInfoCapsTlv, SRv6LocatorTlv, SidLabelRangeTlv, SrAlgoTlv, SrLocalBlockTlv
 };
 use crate::route::{SummaryNet, SummaryNetFlags, SummaryRtr};
 use crate::version::Ospfv3;
@@ -910,6 +908,17 @@ fn lsa_orig_intra_area_prefix(
                         sd_cfg.ipa,
                         bier_encaps,
                     );
+
+                    let srv6 = SRv6LocatorTlv::new(
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        vec![10, 20, 30]
+                    );
+
+                    entry.srv6.push(srv6);
 
                     entry.bier.push(bier);
                 });

@@ -34,7 +34,7 @@ use crate::packet::tlv::{
     GracePeriodTlv, MsdTlv, NodeAdminTagTlv, PrefixSidFlags, RouterFuncCapsTlv,
     RouterInfoCapsTlv, RouterInfoTlvType, SidLabelRangeTlv, SrAlgoTlv,
     SrLocalBlockTlv, SrmsPrefTlv, TLV_HDR_SIZE, UnknownTlv, tlv_encode_end,
-    tlv_encode_start, tlv_wire_len,
+    tlv_encode_start, tlv_wire_len, SRv6LocatorTlv,
 };
 use crate::version::Ospfv3;
 
@@ -892,6 +892,8 @@ pub struct LsaIntraAreaPrefixEntry {
     pub bier: Vec<BierSubTlv>,
     #[new(default)]
     pub unknown_stlvs: Vec<UnknownTlv>,
+    #[new(default)]
+    pub srv6: Vec<SRv6LocatorTlv>,
 }
 
 // OSPFv3 Grace LSA Top Level TLV types.
