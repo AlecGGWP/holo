@@ -37,7 +37,7 @@ use crate::packet::lsa::{
     Lsa, LsaHdrVersion, LsaKey, LsaScope, LsaTypeVersion, PrefixSidVersion,
 };
 use crate::packet::tlv::{
-    BierEncapId, BierEncapSubSubTlv, BierSubSubTlv, BierSubTlv, DynamicHostnameTlv, NodeAdminTagTlv, PrefixSidFlags, RouterInfoCaps, RouterInfoCapsTlv, SRv6LocatorTlv, SidLabelRangeTlv, SrAlgoTlv, SrLocalBlockTlv
+    BierEncapId, BierEncapSubSubTlv, BierSubSubTlv, BierSubTlv, DynamicHostnameTlv, NodeAdminTagTlv, PrefixSidFlags, RouterInfoCaps, RouterInfoCapsTlv, SRv6CapabilitiesTlv, SRv6LocatorTlv, SidLabelRangeTlv, SrAlgoTlv, SrLocalBlockTlv
 };
 use crate::route::{SummaryNet, SummaryNetFlags, SummaryRtr};
 use crate::version::Ospfv3;
@@ -909,20 +909,27 @@ fn lsa_orig_intra_area_prefix(
                         bier_encaps,
                     );
 
-                    let srv6 = SRv6LocatorTlv::new(
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        vec![10, 20, 30]
-                    );
-
-                    entry.srv6.push(srv6);
-
                     entry.bier.push(bier);
                 });
         }
+
+        let srv6_locator_tlv = SRv6LocatorTlv::new(
+            0,
+            1,
+            2,
+            3,
+            4,
+            vec![10, 20, 30]
+        );
+
+        let srv6_capabilities_tlv = SRv6CapabilitiesTlv::new(
+            5,
+            6,
+        );
+
+        entry.srv6_capabilities_tlv.push(srv6_capabilities_tlv);
+
+        entry.srv6_locator_tlv.push(srv6_locator_tlv);
 
         prefixes.push(entry);
     }

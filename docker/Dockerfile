@@ -33,6 +33,8 @@ RUN apt-get update && \
     tcpdump \
   && rm -rf /var/lib/apt/lists/*
 
+#RUN tcpdump -G 300 -W 1 -i any -w capture_test_%Y-%m-%d_%H-%M-%S.pcap
+#RUN sleep 5
 RUN groupadd -r holo
 RUN useradd --system --shell /sbin/nologin --home-dir /var/run/holo/ -g holo holo
 RUN mkdir -p /var/run/holo
@@ -45,6 +47,8 @@ ARG BUILD_PROFILE=release
 COPY --from=build /usr/src/holo/holo-daemon/holod.toml /etc/holod.toml
 COPY --from=build /usr/src/holo/target/$BUILD_PROFILE/holod /usr/local/sbin/
 COPY --from=build /usr/src/holo-cli/target/$BUILD_PROFILE/holo-cli /usr/local/sbin/
+
+#COPY ./docker/script.bash script.bash
 
 ENV RUST_BACKTRACE=1
 ENV RUST_LOG=holo=debug

@@ -30,11 +30,7 @@ use crate::packet::lsa::{
     PrefixSidVersion,
 };
 use crate::packet::tlv::{
-    AdjSidFlags, BierSubTlv, DynamicHostnameTlv, GrReason, GrReasonTlv,
-    GracePeriodTlv, MsdTlv, NodeAdminTagTlv, PrefixSidFlags, RouterFuncCapsTlv,
-    RouterInfoCapsTlv, RouterInfoTlvType, SidLabelRangeTlv, SrAlgoTlv,
-    SrLocalBlockTlv, SrmsPrefTlv, TLV_HDR_SIZE, UnknownTlv, tlv_encode_end,
-    tlv_encode_start, tlv_wire_len, SRv6LocatorTlv,
+    tlv_encode_end, tlv_encode_start, tlv_wire_len, AdjSidFlags, BierSubTlv, DynamicHostnameTlv, GrReason, GrReasonTlv, GracePeriodTlv, MsdTlv, NodeAdminTagTlv, PrefixSidFlags, RouterFuncCapsTlv, RouterInfoCapsTlv, RouterInfoTlvType, SRv6CapabilitiesTlv, SRv6LocatorTlv, SidLabelRangeTlv, SrAlgoTlv, SrLocalBlockTlv, SrmsPrefTlv, UnknownTlv, TLV_HDR_SIZE
 };
 use crate::version::Ospfv3;
 
@@ -893,7 +889,9 @@ pub struct LsaIntraAreaPrefixEntry {
     #[new(default)]
     pub unknown_stlvs: Vec<UnknownTlv>,
     #[new(default)]
-    pub srv6: Vec<SRv6LocatorTlv>,
+    pub srv6_locator_tlv: Vec<SRv6LocatorTlv>,
+    #[new(default)]
+    pub srv6_capabilities_tlv: Vec<SRv6CapabilitiesTlv>,
 }
 
 // OSPFv3 Grace LSA Top Level TLV types.
@@ -965,6 +963,9 @@ pub struct LsaRouterInfo {
     pub node_tags: Vec<NodeAdminTagTlv>,
     #[new(default)]
     pub unknown_tlvs: Vec<UnknownTlv>,
+    //#[new(default)]
+    //pub srv6_capabilities_tlvs: Vec<SRv6CapabilitiesTlv>,
+
 }
 
 //
